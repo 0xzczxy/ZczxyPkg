@@ -1,0 +1,14 @@
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = ZczxyPkg
+  PACKAGE_GUID                   = ebbafc62-dfca-412c-9cae-760301a23ae0
+  PACKAGE_VERSION                = 0.1
+
+[Includes]
+  ExtendedHv/Include
+
+[LibraryClasses]
+
+[Guids]
+
+[Protocols]
