@@ -2,7 +2,6 @@
 
 // Imports
 // None
-extern EFI_STATUS InstallHook_OpenProtocol();
 
 // Public Globals
 // None
@@ -59,15 +58,6 @@ static EFI_STATUS EFIAPI HookedLoadImage(
 ) {
   EFI_STATUS status;
 
-  //
-  // Install Hook on OpenProtocol (PRIMARY HOOK FOR FINDING WINLOAD)
-  //
-  status = InstallHook_OpenProtocol();
-  if (EFI_ERROR(status)) {
-    SerialPrint("[!] Failed to install 'OpenProtocol' hook: %r\n", status);
-    Print(L"[!] Failed to install 'OpenProtocol' hook: %r\n", status);
-  }
-  
   SerialPrint("\n========== LoadImage Called ==========\n");
   SerialPrint("BootPolicy:        %a\n", bootPolicy ? "TRUE" : "FALSE");
   SerialPrintHex("ParentImageHandle", (UINT64)parentImageHandle);

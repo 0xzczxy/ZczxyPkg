@@ -16,6 +16,8 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Protocol/LoadedImage.h>
 #include <IndustryStandard/PeImage.h>
+#include <Library/DevicePathLib.h>
+#include <Protocol/DevicePath.h>
 
 // 
 // Allignment Macros

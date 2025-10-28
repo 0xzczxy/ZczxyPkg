@@ -54,6 +54,7 @@ InstallHook_ExitBootServices(VOID); // Clear seperation of what it does and to w
 
 // Private Functions must be specified with static 
 static VOID HelperFunction(VOID);       // Private
+// Implement private functions after public functions 
 ```
 
 ### Variables

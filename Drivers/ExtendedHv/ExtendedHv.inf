@@ -8,10 +8,9 @@
 
 [Sources]
   Src/Main.c
-  Src/HookExitBootServices.c
   Src/HookStartImage.c
   Src/HookLoadImage.c
-  Src/HookOpenProtocol.c
+  Src/PatchBootmgfwEfi.c
 
 [Packages]
   MdePkg/MdePkg.dec

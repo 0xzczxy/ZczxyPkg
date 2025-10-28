@@ -1,10 +1,8 @@
 #include "ExtendedHv.h"
 
 // Import
-extern EFI_STATUS InstallHook_ExitBootServices(VOID);
 extern EFI_STATUS InstallHook_LoadImage(VOID);
 extern EFI_STATUS InstallHook_StartImage(VOID);
-extern EFI_STATUS InstallHook_OpenProtocol(VOID);
 
 // Public Globals
 _self_state_t gSelfState;
@@ -82,24 +80,6 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
     SerialPrint("[!] Failed to install 'StartImage' hook: %r\n", status);
     Print(L"[!] Failed to install 'StartImage' hook: %r\n", status);
   }
-
-  //
-  // Install Hook on ExitBootServices
-  //
-  status = InstallHook_ExitBootServices();
-  if (EFI_ERROR(status)) {
-    SerialPrint("[!] Failed to install 'ExitBootServices' hook: %r\n", status);
-    Print(L"[!] Failed to install 'ExitBootServices' hook: %r\n", status);
-  }
-
-  //
-  // Install Hook on OpenProtocol (PRIMARY HOOK FOR FINDING WINLOAD)
-  //
-  // status = InstallHook_OpenProtocol();
-  // if (EFI_ERROR(status)) {
-  //   SerialPrint("[!] Failed to install 'OpenProtocol' hook: %r\n", status);
-  //   Print(L"[!] Failed to install 'OpenProtocol' hook: %r\n", status);
-  // }
 
   //
   // Register for virtual address change event
