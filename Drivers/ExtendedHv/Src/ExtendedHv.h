@@ -49,4 +49,13 @@ extern _self_state_t gSelfState;
 #define SSTATE_CHECKPOINT_NULL     0        // Nothing Has been done
 #define SSTATE_CHECKPOINT_LOADED   (1 << 1) // DriverEntry has finished
 
+//
+// Types
+// 
+typedef struct {
+  UINT64 low;
+  UINT64 high;
+} INT128_t;
+
+
 #endif // __EXTENDEDHV_H

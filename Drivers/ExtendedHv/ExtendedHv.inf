@@ -11,6 +11,8 @@
   Src/HookStartImage.c
   Src/HookLoadImage.c
   Src/PatchBootmgfwEfi.c
+  Src/PatchWinloadEfi.c
+  Src/Utils.c
 
 [Packages]
   MdePkg/MdePkg.dec

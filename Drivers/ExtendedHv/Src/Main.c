@@ -117,9 +117,8 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
   return status;
 }
 
-VOID EFIAPI VirtualAddressChangeEvent(IN EFI_EVENT event, IN VOID *_) {
+VOID EFIAPI VirtualAddressChangeEvent(IN EFI_EVENT event, IN VOID *context) {
   SerialPrint("\n[*] VirtualAddressChangeEvent triggered\n");
-  
   SerialPrint("[*] Converting pointers to virtual addresses...\n");
   
   //
