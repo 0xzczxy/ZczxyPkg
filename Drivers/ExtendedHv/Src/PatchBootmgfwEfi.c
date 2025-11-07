@@ -17,7 +17,8 @@ EFI_STATUS PatchBootmgfw(IN VOID *imageBase, IN UINT64 imageSize);
 
 // Private Globals
 static UINT8 gOriginalBytes[16] = {0};
-static UINT8 gTrampoline[32] = {0};  // Original bytes + jump back
+static VOID *gOriginalFunction = NULL;
+static BOOLEAN gPatchCalled = FALSE;
 
 // Pattern for ImgArchStartBootApplication
 static UINT8 gPattern[] = {
@@ -98,27 +99,14 @@ EFI_STATUS PatchBootmgfw(IN VOID *imageBase, IN UINT64 imageSize) {
   SerialPrintHex("ImgArchStartBootApplication", (UINT64)archStartApp);
   
   //
-  // Build trampoline in static array
-  // Copy original bytes (16 bytes)
+  // Store original function pointer
   //
-  SerialPrint("[*] Building trampoline...\n");
-  CopyMem(gTrampoline, archStartApp, 16);
+  gOriginalFunction = archStartApp;
   
   //
-  // Add jump back to original function (after our 5-byte patch)
+  // Install patch (one-time hook)
   //
-  UINT8 *jumpBack = gTrampoline + 16;
-  jumpBack[0] = 0xE9;  // JMP opcode
-  UINT64 returnAddress = (UINT64)archStartApp + 5;
-  INT32 offset = (INT32)(returnAddress - (UINT64)jumpBack - 5);
-  CopyMem(&jumpBack[1], &offset, 4);
-  
-  SerialPrintHex("Trampoline address", (UINT64)gTrampoline);
-  
-  //
-  // Install patch
-  //
-  SerialPrint("[*] Installing patch on ImgArchStartBootApplication...\n");
+  SerialPrint("[*] Installing one-time hook on ImgArchStartBootApplication...\n");
   status = InstallPatch(
     archStartApp,
     (VOID *)PatchedArchStartBootApplication,
@@ -132,10 +120,10 @@ EFI_STATUS PatchBootmgfw(IN VOID *imageBase, IN UINT64 imageSize) {
     return status;
   }
   
-  SerialPrint("[+] Patch installed successfully\n");
+  SerialPrint("[+] One-time hook installed successfully\n");
   SerialPrintHex("Original bytes saved", (UINT64)gOriginalBytes);
   SerialPrint("[+] Bootmgfw.efi patched successfully\n");
-  SerialPrint("[*] Will intercept calls to ImgArchStartBootApplication\n");
+  SerialPrint("[*] Will intercept first call to ImgArchStartBootApplication\n");
   SerialPrint("========================================\n\n");
   
   return EFI_SUCCESS;
@@ -152,6 +140,8 @@ static UINT64 EFIAPI PatchedArchStartBootApplication(
   EFI_STATUS status;
   EFI_IMAGE_DOS_HEADER *dosHeader;
   EFI_IMAGE_NT_HEADERS64 *ntHeaders;
+  typedef UINT64 (EFIAPI *ImgArchStart_t)(INT64*, VOID*, UINT32, INT32, INT128_t*);
+  ImgArchStart_t originalFunc;
   
   SerialPrint(
     "\n"
@@ -159,6 +149,19 @@ static UINT64 EFIAPI PatchedArchStartBootApplication(
     "  ImgArchStartBootApplication Called\n"
     "************************************************\n"
   );
+  
+  //
+  // Check if this is the first call
+  //
+  if (gPatchCalled) {
+    SerialPrint("[!] WARNING: Function called again after first interception!\n");
+    SerialPrint("[*] This should not happen - calling original directly\n");
+    originalFunc = (ImgArchStart_t)gOriginalFunction;
+    return originalFunc(arg1, imageBase, imageSize, arg4, arg5);
+  }
+  
+  gPatchCalled = TRUE;
+  
   SerialPrintHex("[*] arg1 (boot options)", (UINT64)arg1);
   SerialPrintHex("[*] Image Base (arg2)", (UINT64)imageBase);
   SerialPrintHex("[*] Image Size (arg3)", imageSize);
@@ -209,15 +212,26 @@ static UINT64 EFIAPI PatchedArchStartBootApplication(
   }
   
   //
-  // Call original function via trampoline
+  // Restore original bytes BEFORE calling the function
+  // This removes our hook and restores the original code
+  //
+  SerialPrint("[*] Restoring original bytes...\n");
+  CopyMem(gOriginalFunction, gOriginalBytes, 16);
+  SerialPrint("[+] Original function restored\n");
+  
+  //
+  // Now call the original function (with original bytes restored)
   //
   SerialPrint("[*] Calling original ImgArchStartBootApplication...\n");
-  typedef UINT64 (EFIAPI *ImgArchStart_t)(INT64*, VOID*, UINT32, INT32, INT128_t*);
-  ImgArchStart_t originalFunc = (ImgArchStart_t)gTrampoline;
+  originalFunc = (ImgArchStart_t)gOriginalFunction;
   result = originalFunc(arg1, imageBase, imageSize, arg4, arg5);
   
   SerialPrintHex("[*] Original returned", result);
   SerialPrint("************************************************\n\n");
+  
+  //
+  // Note: We do NOT re-apply the patch since we only need one interception
+  //
   
   return result;
 }

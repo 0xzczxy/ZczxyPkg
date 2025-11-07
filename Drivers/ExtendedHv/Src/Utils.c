@@ -8,6 +8,8 @@
 
 // Public Functions
 CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString);
+UINT64 DisableWriteProtection(VOID);
+VOID RestoreWriteProtection(UINT64 originalCr0);
 
 // Private Globals
 // None
@@ -65,4 +67,34 @@ CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString) {
   }
   
   return NULL;
+}
+
+#define CR0_WP_BIT (1ULL << 16)  // Write Protect bit
+
+UINT64 DisableWriteProtection(VOID) {
+  UINT64 cr0;
+  
+  //
+  // Read CR0
+  //
+  cr0 = AsmReadCr0();
+  
+  SerialPrintHex("[*] Original CR0", cr0);
+  
+  //
+  // Clear WP bit
+  //
+  AsmWriteCr0(cr0 & ~CR0_WP_BIT);
+  
+  SerialPrintHex("[*] Modified CR0", AsmReadCr0());
+  SerialPrint("[+] Write protection disabled\n");
+  
+  return cr0;  // Return original value for restoration
+}
+
+VOID RestoreWriteProtection(UINT64 originalCr0) {
+  SerialPrint("[*] Restoring write protection...\n");
+  AsmWriteCr0(originalCr0);
+  SerialPrintHex("[*] Restored CR0", AsmReadCr0());
+  SerialPrint("[+] Write protection restored\n");
 }
