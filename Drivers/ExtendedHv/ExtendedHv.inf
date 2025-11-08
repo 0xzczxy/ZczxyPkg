@@ -10,6 +10,7 @@
   Src/Main.c
   Src/HookStartImage.c
   Src/HookLoadImage.c
+  Src/HookExitBootServices.c
   Src/PatchBootmgfwEfi.c
   Src/PatchWinloadEfi.c
   Src/Utils.c
@@ -44,7 +45,7 @@
   gEfiEventVirtualAddressChangeGuid
 
 [BuildOptions]
-  GCC:*_*_*_CC_FLAGS = -Wno-missing-braces
+  GCC:*_*_*_CC_FLAGS = -Wno-missing-braces -fno-stack-protector -fno-builtin
 
 [Depex]
   TRUE

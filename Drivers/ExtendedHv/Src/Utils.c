@@ -10,6 +10,7 @@
 CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString);
 UINT64 DisableWriteProtection(VOID);
 VOID RestoreWriteProtection(UINT64 originalCr0);
+VOID FlushInstructionCache(IN VOID *address, IN UINTN size);
 
 // Private Globals
 // None
@@ -79,22 +80,36 @@ UINT64 DisableWriteProtection(VOID) {
   //
   cr0 = AsmReadCr0();
   
-  SerialPrintHex("[*] Original CR0", cr0);
+  // SerialPrintHex("[*] Original CR0", cr0);
   
   //
   // Clear WP bit
   //
   AsmWriteCr0(cr0 & ~CR0_WP_BIT);
   
-  SerialPrintHex("[*] Modified CR0", AsmReadCr0());
-  SerialPrint("[+] Write protection disabled\n");
+  // SerialPrintHex("[*] Modified CR0", AsmReadCr0());
+  // SerialPrint("[+] Write protection disabled\n");
   
   return cr0;  // Return original value for restoration
 }
 
 VOID RestoreWriteProtection(UINT64 originalCr0) {
-  SerialPrint("[*] Restoring write protection...\n");
+  // SerialPrint("[*] Restoring write protection...\n");
   AsmWriteCr0(originalCr0);
-  SerialPrintHex("[*] Restored CR0", AsmReadCr0());
-  SerialPrint("[+] Write protection restored\n");
+  // SerialPrintHex("[*] Restored CR0", AsmReadCr0());
+  // SerialPrint("[+] Write protection restored\n");
+}
+
+VOID FlushInstructionCache(IN VOID *address, IN UINTN size) {
+    UINT32 eax, ebx, ecx, edx;
+    
+    //
+    // CPUID acts as a serializing instruction
+    //
+    AsmCpuid(0, &eax, &ebx, &ecx, &edx);
+    
+    //
+    // Memory fence for ordering
+    //
+    MemoryFence();
 }

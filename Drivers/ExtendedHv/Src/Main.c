@@ -1,13 +1,14 @@
 #include "ExtendedHv.h"
 
-// Import
+// Imports
 extern EFI_STATUS InstallHook_LoadImage(VOID);
 extern EFI_STATUS InstallHook_StartImage(VOID);
+extern EFI_STATUS InstallHook_ExitBootServices(VOID);
 
 // Public Globals
 _self_state_t gSelfState;
 
-// Publilc Functions
+// Public Functions
 EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE, IN EFI_SYSTEM_TABLE *);
 
 // Private Globals
@@ -82,13 +83,22 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
   }
 
   //
+  // Install Hook on ExitBootServices
+  // 
+  status = InstallHook_ExitBootServices();
+  if (EFI_ERROR(status)) {
+    SerialPrint("[!] Failed to install 'StartImage' hook: %r\n", status);
+    Print(L"[!] Failed to install 'StartImage' hook: %r\n", status);
+  }
+
+  //
   // Register for virtual address change event
   //
   status = gBS->CreateEventEx(
     EVT_NOTIFY_SIGNAL,
     TPL_NOTIFY,
     VirtualAddressChangeEvent,
-    NULL, // Optional Context to pass to Event, Currently unused
+    NULL,
     &gEfiEventVirtualAddressChangeGuid,
     &virtualAddressChangeEvent
   );
@@ -118,14 +128,18 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
 }
 
 VOID EFIAPI VirtualAddressChangeEvent(IN EFI_EVENT event, IN VOID *context) {
-  SerialPrint("\n[*] VirtualAddressChangeEvent triggered\n");
+  SerialPrint("\n");
+  SerialPrint("================================================\n");
+  SerialPrint("  VirtualAddressChangeEvent Triggered\n");
+  SerialPrint("================================================\n");
   SerialPrint("[*] Converting pointers to virtual addresses...\n");
   
   //
+  // Convert any other pointers your driver uses
   // Example:
   // gRT->ConvertPointer(0, (VOID **)&gSomeGlobalPointer);
   //
   
   SerialPrint("[+] Virtual address conversion complete\n");
+  SerialPrint("================================================\n\n");
 }
-

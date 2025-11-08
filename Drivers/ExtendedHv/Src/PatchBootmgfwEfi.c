@@ -11,6 +11,9 @@ extern VOID *FindPatternPeExecutableSections(
 extern EFI_STATUS InstallPatch(IN VOID *targetFunction, IN VOID *patchFunction, OUT UINT8 *originalBytes);
 extern EFI_STATUS PatchWinload(IN VOID *imageBase, IN UINT64 imageSize);
 
+// Public Globals
+// None
+
 // Public Functions
 BOOLEAN IsBootmgfwEfi(IN CHAR16 *devicePath);
 EFI_STATUS PatchBootmgfw(IN VOID *imageBase, IN UINT64 imageSize);
@@ -19,8 +22,6 @@ EFI_STATUS PatchBootmgfw(IN VOID *imageBase, IN UINT64 imageSize);
 static UINT8 gOriginalBytes[16] = {0};
 static VOID *gOriginalFunction = NULL;
 static BOOLEAN gPatchCalled = FALSE;
-
-// Pattern for ImgArchStartBootApplication
 static UINT8 gPattern[] = {
 	0x48, 0x8b, 0xc4, 0x48, 0x89, 0x58, 0x20, 0x44, 0x89, 0x40, 0x18, 0x48, 0x89, 0x50, 0x10, 0x48,
 	0x89, 0x48, 0x08, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x8d,
@@ -136,7 +137,6 @@ static UINT64 EFIAPI PatchedArchStartBootApplication(
   IN INT32 arg4, 
   IN INT128_t *arg5
 ) {
-  UINT64 result;
   EFI_STATUS status;
   EFI_IMAGE_DOS_HEADER *dosHeader;
   EFI_IMAGE_NT_HEADERS64 *ntHeaders;
@@ -224,14 +224,5 @@ static UINT64 EFIAPI PatchedArchStartBootApplication(
   //
   SerialPrint("[*] Calling original ImgArchStartBootApplication...\n");
   originalFunc = (ImgArchStart_t)gOriginalFunction;
-  result = originalFunc(arg1, imageBase, imageSize, arg4, arg5);
-  
-  SerialPrintHex("[*] Original returned", result);
-  SerialPrint("************************************************\n\n");
-  
-  //
-  // Note: We do NOT re-apply the patch since we only need one interception
-  //
-  
-  return result;
+  return originalFunc(arg1, imageBase, imageSize, arg4, arg5); // This function is a no return
 }

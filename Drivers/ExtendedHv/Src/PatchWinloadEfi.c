@@ -1,306 +1,294 @@
-//
-// Complete BlLdrLoadImage Hook for Secure Kernel Patching
-// Based on reverse engineering findings
-//
-
 #include "ExtendedHv.h"
 
 // Imports
-extern CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString);
-extern VOID *FindPatternPeExecutableSections(
-  IN VOID *imageBase, IN UINT64 imageSize,
-  IN VOID *pattern, IN VOID *mask,
-  IN UINT64 pattern_size
-);
-extern EFI_STATUS InstallPatch(IN VOID *targetFunction, IN VOID *patchFunction, OUT UINT8 *originalBytes);
 extern UINT64 DisableWriteProtection(VOID);
 extern VOID RestoreWriteProtection(UINT64 originalCr0);
 
-//
-// Boot loader data table entry structure
-//
+// Internal Types
 typedef struct _LDR_DATA_TABLE_ENTRY {
-    LIST_ENTRY InLoadOrderLinks;           // +0x00
-    LIST_ENTRY InMemoryOrderLinks;         // +0x10
-    LIST_ENTRY InInitializationOrderLinks; // +0x20
-    VOID *DllBase;                         // +0x30 ← Image base
-    VOID *EntryPoint;                      // +0x38
-    UINTN SizeOfImage;                     // +0x40
+   LIST_ENTRY InLoadOrderLinks;
+   LIST_ENTRY InMemoryOrderLinks;
+   LIST_ENTRY InInitializationOrderLinks;
+   VOID *DllBase;
+   VOID *EntryPoint;
+   UINTN SizeOfImage;
 } LDR_DATA_TABLE_ENTRY;
 
-//
-// BlLdrLoadImage function signature
-//
-typedef UINT64 (EFIAPI *BlLdrLoadImage_t)(
-    VOID *arg_01, VOID *arg_02, VOID *arg_03, VOID *arg_04,
-    VOID *arg_05, VOID *arg_06, VOID *arg_07, VOID *arg_08,
-    VOID *arg_09, VOID *arg_10, VOID *arg_11, VOID *arg_12,
-    VOID *arg_13, VOID *arg_14, VOID *arg_15, VOID *arg_16
+// No __fastcall needed - x64 uses fastcall by default
+typedef UINT64 (*func_BlLdrLoadImage)(
+    VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*,  // 1-8
+    VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*,  // 9-16
+    VOID*, VOID*, VOID*, VOID*                               // 17-20 (extra for future-proofing)
 );
 
-// Pattern for BlLdrLoadImage at offset 0x1801981fc
-static UINT8 gBlLdrLoadImagePattern[] = {
-	0x48, 0x8b, 0xc4, 0x48, 0x89, 0x58, 0x08, 0x48, 0x89, 0x70, 0x10, 0x48, 0x89, 0x78, 0x18, 0x55,
-	0x48, 0x8d, 0x68, 0xf1, 0x48, 0x81, 0xec, 0xc0, 0x00, 0x00, 0x00, 0x8b, 0xf1, 0xc6, 0x45, 0xd7,
-	0x00, 0x49, 0x8b, 0xc1, 0x48, 0x8d, 0x4d, 0xd7, 0x48, 0x89, 0x4c, 0x24, 0x28, 0x4c, 0x8d, 0x4d,
-	0xef, 0x48, 0x8d, 0x4d, 0xdf, 0x48, 0x8b, 0xfa, 0x48, 0x89, 0x4c, 0x24, 0x20, 0x0f, 0x57, 0xc0,
-	0x0f, 0x57, 0xc9, 0x49, 0x8b, 0xc8, 0x48, 0x8b, 0xd0, 0x0f, 0x11, 0x45, 0xdf, 0x0f, 0x11, 0x4d,
-	0xef, 0xe8, 0x2a, 0xf6, 0xff, 0xff, 0x8b, 0xd8, 0x85, 0xc0, 0x0f, 0x88, 0x90, 0x00, 0x00, 0x00,
-	0x48, 0x8b, 0x85, 0x97, 0x00, 0x00, 0x00, 0x4c, 0x8d, 0x4d, 0xdf, 0x48, 0x89, 0x84, 0x24, 0x88,
-	0x00, 0x00, 0x00, 0x4c, 0x8d, 0x45, 0xef, 0x48, 0x8b, 0x85, 0x8f, 0x00, 0x00, 0x00, 0x48, 0x8b,
-	0xd7, 0x48, 0x89, 0x84, 0x24, 0x80, 0x00, 0x00, 0x00, 0x8b, 0xce, 0x8b, 0x85, 0x87, 0x00, 0x00,
-	0x00, 0x89, 0x44, 0x24, 0x78, 0x8b, 0x45, 0x7f, 0x89, 0x44, 0x24, 0x70, 0x8b, 0x45, 0x77, 0x89,
-	0x44, 0x24, 0x68, 0x8b, 0x45, 0x6f, 0x89, 0x44, 0x24, 0x60, 0x8b, 0x45, 0x67, 0x89, 0x44, 0x24,
-	0x58, 0x48, 0x8b, 0x45, 0x5f, 0x48, 0x89, 0x44, 0x24, 0x50, 0x48, 0x8b, 0x45, 0x57, 0x48, 0x89,
-	0x44, 0x24, 0x48, 0x48, 0x83, 0x64, 0x24, 0x40, 0x00, 0x48, 0x8b, 0x45, 0x4f, 0x48, 0x89, 0x44,
-	0x24, 0x38, 0x8b, 0x45, 0x47, 0x89, 0x44, 0x24, 0x30, 0x8b, 0x45, 0x3f, 0x89, 0x44, 0x24, 0x28,
-	0x48, 0x8b, 0x45, 0x37, 0x48, 0x89, 0x44, 0x24, 0x20, 0xe8, 0x96, 0xe8, 0xff, 0xff, 0x8b, 0xd8,
-	0x80, 0x7d, 0xd7, 0x00, 0x74, 0x09, 0x48, 0x8d, 0x4d, 0xdf, 0xe8, 0x49, 0x3c, 0xff, 0xff, 0x4c,
-	0x8d, 0x9c, 0x24, 0xc0, 0x00, 0x00, 0x00, 0x8b, 0xc3, 0x49, 0x8b, 0x5b, 0x10, 0x49, 0x8b, 0x73,
-	0x18, 0x49, 0x8b, 0x7b, 0x20, 0x49, 0x8b, 0xe3, 0x5d, 0xc3
-};
+// Public Functions
+EFI_STATUS PatchWinload(IN VOID *imageBase, IN UINT64 imageSize);
 
-static UINT8 gBlLdrLoadImageOriginalBytes[16] = {0};
-static VOID *gBlLdrLoadImageOriginal = NULL;
-static BOOLEAN gSecureKernelPatched = FALSE;
-
-// Forward declarations
-static UINT64 EFIAPI HookedBlLdrLoadImage(
-    VOID *arg_01, VOID *arg_02, VOID *arg_03, VOID *arg_04,
-    VOID *arg_05, VOID *arg_06, VOID *arg_07, VOID *arg_08,
-    VOID *arg_09, VOID *arg_10, VOID *arg_11, VOID *arg_12,
-    VOID *arg_13, VOID *arg_14, VOID *arg_15, VOID *arg_16
+// Private Functions
+static UINT64 PatchedBlLdrLoadImage(
+    VOID *arg1, VOID *arg2, VOID *arg3, VOID *arg4,
+    VOID *arg5, VOID *arg6, VOID *arg7, VOID *arg8,
+    VOID *arg9, VOID *arg10, VOID *arg11, VOID *arg12,
+    VOID *arg13, VOID *arg14, VOID *arg15, VOID *arg16,
+    VOID *arg17, VOID *arg18, VOID *arg19, VOID *arg20
 );
-static EFI_STATUS PatchSecureKernel(IN VOID *imageBase, IN UINT64 imageSize);
+static VOID *FindExportByName(VOID *imageBase, const char *exportName);
+static UINT8 *FindFreeSpaceInTextSection(VOID *imageBase, UINTN *outRva);
+static EFI_STATUS PatchExportTable(VOID *imageBase, const char *exportName, UINT32 newRva);
 
-//
-// Main patching function
-//
+// Private Globals
+static func_BlLdrLoadImage gOriginalBlLdrLoadImage = NULL;
+static UINT32 gCallCount = 0;
+
+
+
 EFI_STATUS PatchWinload(IN VOID *imageBase, IN UINT64 imageSize) {
-    EFI_STATUS status;
-    VOID *blLdrLoadImage;
-    UINT64 originalCr0;
-    
-    if (!imageBase || imageSize == 0) {
-        SerialPrint("[!] Invalid parameters\n");
-        return EFI_INVALID_PARAMETER;
-    }
-    
     SerialPrint(
         "\n"
         "========================================\n"
-        "  Patching Winload.efi\n"
+        "  Patching Winload\n"
         "========================================\n"
     );
-    SerialPrintHex("ImageBase", (UINT64)imageBase);
-    SerialPrintHex("ImageSize", imageSize);
-    
+
     //
-    // Find BlLdrLoadImage
-    // Known offset: 0x1801981fc (adjust based on your winload version)
-    //
-    SerialPrint("[*] Searching for BlLdrLoadImage...\n");
-    
-    // Option 1: Use known offset if available
-    // blLdrLoadImage = (VOID *)((UINT8 *)imageBase + 0x1981fc);
-    
-    // Option 2: Pattern search
-    blLdrLoadImage = FindPatternPeExecutableSections(
-        imageBase, imageSize,
-        gBlLdrLoadImagePattern, NULL,
-        sizeof(gBlLdrLoadImagePattern)
-    );
-    
-    if (!blLdrLoadImage) {
-        SerialPrint("[!] Failed to find BlLdrLoadImage\n");
-        SerialPrint("[!] Winload patching failed\n");
-        SerialPrint("========================================\n\n");
+    // Find BlLdrLoadImage via export table
+    // 
+    SerialPrint("[*] Searching for BlLdrLoadImage export...\n");
+    VOID *originalFunc = FindExportByName(imageBase, "BlLdrLoadImage");
+
+    if (!originalFunc) {
+        SerialPrint("[-] BlLdrLoadImage export not found\n");
         return EFI_NOT_FOUND;
     }
-    
-    SerialPrintHex("BlLdrLoadImage", (UINT64)blLdrLoadImage);
-    gBlLdrLoadImageOriginal = blLdrLoadImage;
-    
+
+    SerialPrint("[+] Found BlLdrLoadImage at: 0x%llx\n", (UINT64)originalFunc);
+    gOriginalBlLdrLoadImage = (func_BlLdrLoadImage)originalFunc;
+
     //
-    // Install hook
+    // Find free space in .text section
+    // 
+    SerialPrint("[*] Locating free space in .text section...\n");
+    UINTN trampolineRva;
+    UINT8 *trampolineAddr = FindFreeSpaceInTextSection(imageBase, &trampolineRva);
+    
+    if (!trampolineAddr) {
+        SerialPrint("[-] No free space in .text section\n");
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    SerialPrint("[+] Trampoline location: 0x%llx (RVA: 0x%llx)\n", 
+                (UINT64)trampolineAddr, trampolineRva);
+
     //
-    SerialPrint("[*] Installing hook on BlLdrLoadImage...\n");
-    originalCr0 = DisableWriteProtection();
+    // Write trampoline code
+    // 
+    SerialPrint("[*] Writing trampoline...\n");
+    UINT64 cr0 = DisableWriteProtection();
+
+    //
+    // Trampoline: mov rax, <PatchedBlLdrLoadImage>; jmp rax
+    // 
+    trampolineAddr[0] = 0x48;
+    trampolineAddr[1] = 0xB8;
+    *(UINT64 *)&trampolineAddr[2] = (UINT64)&PatchedBlLdrLoadImage;
+    trampolineAddr[10] = 0xFF;
+    trampolineAddr[11] = 0xE0;
     
-    status = InstallPatch(
-        blLdrLoadImage,
-        (VOID *)HookedBlLdrLoadImage,
-        gBlLdrLoadImageOriginalBytes
-    );
-    
-    RestoreWriteProtection(originalCr0);
+    RestoreWriteProtection(cr0);
+    SerialPrint("[+] Trampoline written\n");
+
+    //
+    // Patch export table
+    // 
+    SerialPrint("[*] Patching export table...\n");
+    EFI_STATUS status = PatchExportTable(imageBase, "BlLdrLoadImage", (UINT32)trampolineRva);
     
     if (EFI_ERROR(status)) {
-        SerialPrint("[!] Failed to install patch: %r\n", status);
-        SerialPrint("[!] Winload patching failed\n");
-        SerialPrint("========================================\n\n");
+        SerialPrint("[-] Failed to patch export table\n");
         return status;
     }
-    
-    SerialPrint("[+] BlLdrLoadImage hooked successfully\n");
-    SerialPrint("[*] Waiting for securekernel.exe load...\n");
-    SerialPrint("========================================\n\n");
-    
+
+    SerialPrint("[+] Hook installed successfully\n");
     return EFI_SUCCESS;
 }
 
-//
-// BlLdrLoadImage hook
-//
-static UINT64 EFIAPI HookedBlLdrLoadImage(
-    VOID *arg_01, VOID *arg_02, VOID *arg_03, VOID *arg_04,
-    VOID *arg_05, VOID *arg_06, VOID *arg_07, VOID *arg_08,
-    VOID *arg_09, VOID *arg_10, VOID *arg_11, VOID *arg_12,
-    VOID *arg_13, VOID *arg_14, VOID *arg_15, VOID *arg_16
+static UINT64 PatchedBlLdrLoadImage(
+    VOID *arg1, VOID *arg2, VOID *arg3, VOID *arg4,
+    VOID *arg5, VOID *arg6, VOID *arg7, VOID *arg8,
+    VOID *arg9, VOID *arg10, VOID *arg11, VOID *arg12,
+    VOID *arg13, VOID *arg14, VOID *arg15, VOID *arg16,
+    VOID *arg17, VOID *arg18, VOID *arg19, VOID *arg20
 ) {
-    UINT64 status;
-    BlLdrLoadImage_t originalFunc;
-    UINT64 originalCr0;
-    CHAR16 *modulePath = NULL;
-    BOOLEAN isSecureKernel = FALSE;
+    gCallCount++;
     
-    //
-    // Restore original function
-    //
-    originalCr0 = DisableWriteProtection();
-    CopyMem(gBlLdrLoadImageOriginal, gBlLdrLoadImageOriginalBytes, 16);
-    RestoreWriteProtection(originalCr0);
+    SerialPrint("\n[*] === BlLdrLoadImage HOOK CALLED (Call #%d) ===\n", gCallCount);
+    SerialPrint("[*] arg1: 0x%llx, arg2: 0x%llx\n", (UINT64)arg1, (UINT64)arg2);
+    
+    // Check if arg2 is a path (it should be UTF-16 string)
+    if (arg2 != NULL) {
+        UINT16 *path = (UINT16 *)arg2;
+        SerialPrint("[*] arg2 (path): ");
+        for (UINTN i = 0; i < 64 && path[i] != 0; i++) {
+            if (path[i] < 128) {
+                SerialPrint("%c", (char)path[i]);
+            }
+        }
+        SerialPrint("\n");
+    }
     
     //
     // Call original
-    //
-    originalFunc = (BlLdrLoadImage_t)gBlLdrLoadImageOriginal;
-    status = originalFunc(
-        arg_01, arg_02, arg_03, arg_04, arg_05, arg_06, arg_07, arg_08,
-        arg_09, arg_10, arg_11, arg_12, arg_13, arg_14, arg_15, arg_16
+    //  
+    UINT64 status = gOriginalBlLdrLoadImage(
+        arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8,
+        arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16,
+        arg17, arg18, arg19, arg20
     );
-    
-    //
-    // Re-install hook
-    //
-    originalCr0 = DisableWriteProtection();
-    UINT8 *target = (UINT8 *)gBlLdrLoadImageOriginal;
-    UINT64 patchAddr = (UINT64)HookedBlLdrLoadImage;
-    target[0] = 0xFF;
-    target[1] = 0x25;
-    target[2] = 0x00;
-    target[3] = 0x00;
-    target[4] = 0x00;
-    target[5] = 0x00;
-    CopyMem(&target[6], &patchAddr, sizeof(UINT64));
-    RestoreWriteProtection(originalCr0);
 
+    SerialPrint("[*] BlLdrLoadImage returned: 0x%llx\n", status);
+    SerialPrint("[*] arg8 pointer: 0x%llx\n", (UINT64)arg8);
 
-    //
-    // Check ALL possible path locations
-    //
-    
-    // Try arg_02 (direct path - rare)
-    if (arg_02 && (UINT64)arg_02 > 0x1000) {
-        modulePath = (CHAR16 *)arg_02;
-    }
-    
-    // Try arg_03 (more common based on disassembly)
-    if (!modulePath && arg_03 && (UINT64)arg_03 > 0x1000) {
-        // arg_03 might be a structure containing the path
-        // Try as direct CHAR16*
-        CHAR16 *test = (CHAR16 *)arg_03;
-        if (test[0] > 0x20 && test[0] < 0x7F) {
-            modulePath = test;
-        }
-    }
-    
-    // Try arg_04 similarly
-    if (!modulePath && arg_04 && (UINT64)arg_04 > 0x1000) {
-        CHAR16 *test = (CHAR16 *)arg_04;
-        if (test[0] > 0x20 && test[0] < 0x7F) {
-            modulePath = test;
-        }
-    }
-    
-    //
-    // Extract filename if we found a path
-    //
-    if (modulePath) {
-        CHAR16 *filename = modulePath;
-        for (CHAR16 *p = modulePath; *p != 0 && (p - modulePath) < 512; p++) {
-            if (*p == L'\\' || *p == L'/') {
-                filename = p + 1;
-            }
-        }
+    if (arg8 != NULL) {
+        LDR_DATA_TABLE_ENTRY **ldrEntryPtr = (LDR_DATA_TABLE_ENTRY **)arg8;
+        SerialPrint("[*] *arg8 (LDR_DATA_TABLE_ENTRY*): 0x%llx\n", (UINT64)(*ldrEntryPtr));
         
-        isSecureKernel = (StriStr(filename, L"securekernel") != NULL);
-        
-        // Only log interesting files to reduce spam
-        if (isSecureKernel || StriStr(filename, L".exe") || StriStr(filename, L".sys")) {
-            SerialPrint("[*] BlLdrLoadImage: %s%s\n", 
-                filename,
-                isSecureKernel ? " ← TARGET FOUND!" : "");
-        }
-    }
-    
-    //
-    // Check arg_08 for LDR entry AFTER successful call
-    //
-    if (isSecureKernel && status == 0 && arg_08) {
-        if (!gSecureKernelPatched) {
-            gSecureKernelPatched = TRUE;
+        if (*ldrEntryPtr != NULL) {
+            LDR_DATA_TABLE_ENTRY *ldrEntry = *ldrEntryPtr;
             
-            LDR_DATA_TABLE_ENTRY *ldrEntry = *(LDR_DATA_TABLE_ENTRY **)arg_08;
-            
-            if (ldrEntry && ldrEntry->DllBase) {
-                SerialPrint("\n************************************************\n");
-                SerialPrint("  SECURE KERNEL DETECTED!\n");
-                SerialPrint("************************************************\n");
-                SerialPrintHex("  DllBase", (UINT64)ldrEntry->DllBase);
-                SerialPrintHex("  EntryPoint", (UINT64)ldrEntry->EntryPoint);
-                SerialPrintHex("  SizeOfImage", ldrEntry->SizeOfImage);
-                
-                // Patch it NOW
-                EFI_STATUS patchStatus = PatchSecureKernel(
-                    ldrEntry->DllBase, 
-                    ldrEntry->SizeOfImage
-                );
-                
-                if (!EFI_ERROR(patchStatus)) {
-                    SerialPrint("[+] *** SECURE KERNEL PATCHED! ***\n");
-                } else {
-                    SerialPrint("[!] Patch failed: %r\n", patchStatus);
-                }
-                SerialPrint("************************************************\n\n");
+            SerialPrint("[+] Module loaded successfully:\n");
+            SerialPrint("    DllBase: 0x%llx\n", (UINT64)ldrEntry->DllBase);
+            SerialPrint("    EntryPoint: 0x%llx\n", (UINT64)ldrEntry->EntryPoint);
+            SerialPrint("    SizeOfImage: 0x%llx\n", ldrEntry->SizeOfImage);
+
+            // Check for HvImageInfo export
+            VOID *hvImageInfo = FindExportByName(ldrEntry->DllBase, "HvImageInfo");
+            if (hvImageInfo != NULL) {
+                SerialPrint("\n[!!!] FOUND SECUREKERNEL.EXE!\n");
+                SerialPrint("[!!!] HvImageInfo export at: 0x%llx\n", (UINT64)hvImageInfo);
+                SerialPrint("\n");
             }
         }
     }
-    
+
+    SerialPrint("[*] === End Hook Call #%d ===\n\n", gCallCount);
     return status;
 }
 
-//
-// Secure kernel patching implementation
-//
-static EFI_STATUS PatchSecureKernel(IN VOID *imageBase, IN UINT64 imageSize) {
-    SerialPrint("[*] PatchSecureKernel called\n");
-    SerialPrintHex("  Base", (UINT64)imageBase);
-    SerialPrintHex("  Size", imageSize);
+static VOID *FindExportByName(VOID *imageBase, const char *exportName) {
+    EFI_IMAGE_DOS_HEADER *dosHeader = (EFI_IMAGE_DOS_HEADER *)imageBase;
+    EFI_IMAGE_NT_HEADERS64 *ntHeaders = (EFI_IMAGE_NT_HEADERS64 *)((UINT8 *)imageBase + dosHeader->e_lfanew);
     
-    //
-    // TODO: Implement your secure kernel patches here
-    //
-    // Example targets in securekernel.exe:
-    // 1. VTL (Virtual Trust Level) transition handlers
-    // 2. Secure service dispatch tables
-    // 3. Credential Guard policy enforcement
-    // 4. Device Guard code integrity checks
-    // 5. VSM (Virtual Secure Mode) initialization
-    //
+    UINT32 exportDirRva = ntHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    if (exportDirRva == 0) {
+        return NULL;
+    }
+
+    EFI_IMAGE_EXPORT_DIRECTORY *exportDir = (EFI_IMAGE_EXPORT_DIRECTORY *)((UINT8 *)imageBase + exportDirRva);
+    UINT32 *nameTable = (UINT32 *)((UINT8 *)imageBase + exportDir->AddressOfNames);
+    UINT16 *ordinalTable = (UINT16 *)((UINT8 *)imageBase + exportDir->AddressOfNameOrdinals);
+    UINT32 *functionTable = (UINT32 *)((UINT8 *)imageBase + exportDir->AddressOfFunctions);
+
+    for (UINT32 i = 0; i < exportDir->NumberOfNames; i++) {
+        const char *name = (const char *)((UINT8 *)imageBase + nameTable[i]);
+        
+        // Compare strings manually (no strcmp available)
+        BOOLEAN match = TRUE;
+        for (UINTN j = 0; exportName[j] != '\0' || name[j] != '\0'; j++) {
+            if (exportName[j] != name[j]) {
+                match = FALSE;
+                break;
+            }
+        }
+
+        if (match) {
+            UINT16 ordinal = ordinalTable[i];
+            UINT32 rva = functionTable[ordinal];
+            return (VOID *)((UINT8 *)imageBase + rva);
+        }
+    }
+
+    return NULL;
+}
+
+static UINT8 *FindFreeSpaceInTextSection(VOID *imageBase, UINTN *outRva) {
+    EFI_IMAGE_DOS_HEADER *dosHeader = (EFI_IMAGE_DOS_HEADER *)imageBase;
+    EFI_IMAGE_NT_HEADERS64 *ntHeaders = (EFI_IMAGE_NT_HEADERS64 *)((UINT8 *)imageBase + dosHeader->e_lfanew);
     
-    SerialPrint("[*] TODO: Add secure kernel patches\n");
-    SerialPrint("[*] Current functionality: Detection only\n");
+    EFI_IMAGE_SECTION_HEADER *sections = (EFI_IMAGE_SECTION_HEADER *)((UINT8 *)&ntHeaders->OptionalHeader + 
+                                          ntHeaders->FileHeader.SizeOfOptionalHeader);
     
-    return EFI_SUCCESS;
+    for (UINT16 i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++) {
+        // Check if this is .text section
+        BOOLEAN isTextSection = TRUE;
+        const char textName[] = ".text";
+        for (UINTN j = 0; j < 6; j++) {
+            if (sections[i].Name[j] != textName[j]) {
+                isTextSection = FALSE;
+                break;
+            }
+        }
+
+        if (isTextSection) {
+            // Calculate aligned size
+            UINT32 alignedSize = (sections[i].Misc.VirtualSize + ntHeaders->OptionalHeader.SectionAlignment - 1) 
+                                & ~(ntHeaders->OptionalHeader.SectionAlignment - 1);
+            
+            UINT32 freeSpace = alignedSize - sections[i].Misc.VirtualSize;
+            
+            SerialPrint("[*] .text section: VirtualSize=0x%x, Aligned=0x%x, Free=0x%x\n",
+                        sections[i].Misc.VirtualSize, alignedSize, freeSpace);
+
+            // Need at least 12 bytes for trampoline
+            if (freeSpace >= 12) {
+                UINT32 rva = sections[i].VirtualAddress + sections[i].Misc.VirtualSize;
+                *outRva = rva;
+                return (UINT8 *)imageBase + rva;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static EFI_STATUS PatchExportTable(VOID *imageBase, const char *exportName, UINT32 newRva) {
+    EFI_IMAGE_DOS_HEADER *dosHeader = (EFI_IMAGE_DOS_HEADER *)imageBase;
+    EFI_IMAGE_NT_HEADERS64 *ntHeaders = (EFI_IMAGE_NT_HEADERS64 *)((UINT8 *)imageBase + dosHeader->e_lfanew);
+    
+    UINT32 exportDirRva = ntHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    if (exportDirRva == 0) {
+        return EFI_NOT_FOUND;
+    }
+
+    EFI_IMAGE_EXPORT_DIRECTORY *exportDir = (EFI_IMAGE_EXPORT_DIRECTORY *)((UINT8 *)imageBase + exportDirRva);
+    UINT32 *nameTable = (UINT32 *)((UINT8 *)imageBase + exportDir->AddressOfNames);
+    UINT16 *ordinalTable = (UINT16 *)((UINT8 *)imageBase + exportDir->AddressOfNameOrdinals);
+    UINT32 *functionTable = (UINT32 *)((UINT8 *)imageBase + exportDir->AddressOfFunctions);
+
+    for (UINT32 i = 0; i < exportDir->NumberOfNames; i++) {
+        const char *name = (const char *)((UINT8 *)imageBase + nameTable[i]);
+        
+        BOOLEAN match = TRUE;
+        for (UINTN j = 0; exportName[j] != '\0' || name[j] != '\0'; j++) {
+            if (exportName[j] != name[j]) {
+                match = FALSE;
+                break;
+            }
+        }
+
+        if (match) {
+            UINT16 ordinal = ordinalTable[i];
+            UINT32 oldRva = functionTable[ordinal];
+            
+            SerialPrint("[*] Found export at ordinal %d, old RVA: 0x%x\n", ordinal, oldRva);
+            
+            UINT64 cr0 = DisableWriteProtection();
+            functionTable[ordinal] = newRva;
+            RestoreWriteProtection(cr0);
+            
+            SerialPrint("[+] Patched to new RVA: 0x%x\n", newRva);
+            return EFI_SUCCESS;
+        }
+    }
+
+    return EFI_NOT_FOUND;
 }
