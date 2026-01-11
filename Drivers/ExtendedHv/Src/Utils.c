@@ -8,9 +8,7 @@
 
 // Public Functions
 CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString);
-UINT64 DisableWriteProtection(VOID);
-VOID RestoreWriteProtection(UINT64 originalCr0);
-VOID FlushInstructionCache(IN VOID *address, IN UINTN size);
+int StrCmp_(const CHAR16 *p1, const CHAR16 *p2);
 
 // Private Globals
 // None
@@ -19,6 +17,11 @@ VOID FlushInstructionCache(IN VOID *address, IN UINTN size);
 // None
 
 
+
+int StrCmp_(const CHAR16 *p1, const CHAR16 *p2) {
+  while ( *p1 && *p1 == *p2 ) { ++p1; ++p2; }
+  return ( *p1 > *p2 ) - ( *p2  > *p1 );
+}
 
 CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString) {
   CHAR16 *source;
@@ -36,9 +39,6 @@ CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString) {
     return (CHAR16 *)string;
   }
   
-  //
-  // Case-insensitive substring search
-  //
   source = (CHAR16 *)string;
   while (*source != L'\0') {
     for (i = 0; i < searchLen; i++) {
@@ -68,48 +68,4 @@ CHAR16 *StriStr(IN CONST CHAR16 *string, IN CONST CHAR16 *searchString) {
   }
   
   return NULL;
-}
-
-#define CR0_WP_BIT (1ULL << 16)  // Write Protect bit
-
-UINT64 DisableWriteProtection(VOID) {
-  UINT64 cr0;
-  
-  //
-  // Read CR0
-  //
-  cr0 = AsmReadCr0();
-  
-  // SerialPrintHex("[*] Original CR0", cr0);
-  
-  //
-  // Clear WP bit
-  //
-  AsmWriteCr0(cr0 & ~CR0_WP_BIT);
-  
-  // SerialPrintHex("[*] Modified CR0", AsmReadCr0());
-  // SerialPrint("[+] Write protection disabled\n");
-  
-  return cr0;  // Return original value for restoration
-}
-
-VOID RestoreWriteProtection(UINT64 originalCr0) {
-  // SerialPrint("[*] Restoring write protection...\n");
-  AsmWriteCr0(originalCr0);
-  // SerialPrintHex("[*] Restored CR0", AsmReadCr0());
-  // SerialPrint("[+] Write protection restored\n");
-}
-
-VOID FlushInstructionCache(IN VOID *address, IN UINTN size) {
-    UINT32 eax, ebx, ecx, edx;
-    
-    //
-    // CPUID acts as a serializing instruction
-    //
-    AsmCpuid(0, &eax, &ebx, &ecx, &edx);
-    
-    //
-    // Memory fence for ordering
-    //
-    MemoryFence();
 }

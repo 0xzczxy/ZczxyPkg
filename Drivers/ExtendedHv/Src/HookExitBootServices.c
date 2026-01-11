@@ -4,7 +4,10 @@
 // None
 
 // Public Globals
-// None
+extern UINT64 gBlLdrLoadImageCallCount;
+extern BOOLEAN gHvDetected;
+extern UINT64 gHvImageBase;
+extern UINTN gHvImageSize;
 
 // Public Functions
 EFI_STATUS InstallHook_ExitBootServices(VOID);
@@ -52,15 +55,34 @@ static EFI_STATUS EFIAPI HookedExitBootServices(IN EFI_HANDLE imageHandle, IN UI
   );
 
   //
-  // TODO
-  // Add final logging and cleanup. Once this is called, winload.efi
-  // has finished doing everything important and continued to transfer
-  // into the ntoskrnl.
+  // Report winload statistics
   // 
-
+  SerialPrint("[*] BlLdrLoadImage was called %lu times\n", gBlLdrLoadImageCallCount);
+  
+  if (gBlLdrLoadImageCallCount == 0) {
+    SerialPrint("[!] WARNING: Hook was never called!\n");
+    SerialPrint("[!] Winload patch failed\n");
+  } else {
+    SerialPrint("[+] Winload patch working correctly\n");
+  }
 
   //
-  // Not our target, pass through to original
+  // Report hv.exe detection
+  //
+  if (gHvDetected) {
+    SerialPrint("\n[+] HV.EXE DETECTED!\n");
+    SerialPrintHex("  Base address", gHvImageBase);
+    SerialPrintHex("  Image size", gHvImageSize);
+    SerialPrint("[*] Ready for hypervisor patching\n");
+  } else {
+    SerialPrint("\n[!] HV.EXE NOT DETECTED\n");
+    SerialPrint("[!] System not using Hyper-V or VBS disabled\n");
+  }
+
+  SerialPrint("========================================\n\n");
+
+  //
+  // Pass through to original
   //
   return gOriginal(imageHandle, mapKey);
 }
