@@ -16,7 +16,7 @@ EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 __attribute__((section(".text"))) static volatile patchinfo_t gBlLdrLoadImagePatchInfo;
 
 // Private Functions
-static EFI_STATUS PatchedBlLdrLoadImage(
+static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   VOID* arg1, VOID* arg2, VOID* arg3, VOID* arg4, VOID* arg5, VOID* arg6, VOID* arg7,
   VOID* arg8, VOID* arg9, VOID* arg10, VOID* arg11, VOID* arg12, VOID* arg13,
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
@@ -52,7 +52,7 @@ EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction) {
   return status;
 }
 
-static EFI_STATUS PatchedBlLdrLoadImage(
+static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   VOID* arg1, VOID* arg2, VOID* arg3, VOID* arg4, VOID* arg5, VOID* arg6, VOID* arg7,
   VOID* arg8, VOID* arg9, VOID* arg10, VOID* arg11, VOID* arg12, VOID* arg13,
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
@@ -75,7 +75,7 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   // 
   const EFI_STATUS status =
     (
-      (EFI_STATUS(*)(VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*))
+      (EFI_STATUS (EFIAPI *)(VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*))
       gBlLdrLoadImagePatchInfo.trampoline
     )
     (arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
