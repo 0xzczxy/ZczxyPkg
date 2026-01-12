@@ -5,6 +5,7 @@
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern UINT64 PeGetExport(IN CONST VOID *base, IN CONST CHAR8 *export);
+extern EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 
 // Public Globals
 // None
@@ -87,8 +88,11 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   //
   // Patch Winload
   // 
-  
-
+  if (EFI_ERROR(InstallPatch_BlLdrLoadImage((VOID*)blLdrLoadImageAddr))) {
+    SerialPrint("Failed to patch BlLdrLoadImage\n");
+    // Don't jump, we have done our hook work so we let it end.
+  }
+    
   //
   // We have completed our work, remove hook
   // 

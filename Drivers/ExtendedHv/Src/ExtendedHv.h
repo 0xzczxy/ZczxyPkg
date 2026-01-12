@@ -32,9 +32,10 @@
 // 
 struct patchinfo {
   void *trampoline;
-  void *target_function;
+  const void *target_function;
   void *original_function;
-  unsigned char original_buffer[48];
+  UINT64 size;
+  unsigned char buffer[48];
 };
 typedef struct patchinfo patchinfo_t;
 

@@ -10,6 +10,8 @@
   Src/Main.c
   Src/HookExitBootServices.c
   Src/HookGetVariable.c
+  Src/PatchWinloadEfi.c
+  Src/Patch.c
   Src/Pe.c
   Src/SerialPrint.c
 

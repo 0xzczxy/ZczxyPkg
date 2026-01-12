@@ -1,5 +1,5 @@
 #include "Compiler.h"
-#include "ExtendHv.h"
+#include "ExtendedHv.h"
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
@@ -7,11 +7,11 @@ extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern EFI_STATUS InstallPatch(patchinfo_t *info, void *originalFunction, void *targetFunction);
 
 // Public Globals
-BOOL gBlLdrLoadImageReached = FALSE;
+BOOLEAN gBlLdrLoadImageReached = FALSE;
 patchinfo_t gBlLdrLoadImagePatchInfo = {0};
 
 // Public Functions
-EFI_STATUS InstallPatch_BlLdrLoadImage(VOID);
+EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 
 // Private Globals
 // None
@@ -25,7 +25,7 @@ static EFI_STATUS HookedBlLdrLoadImage(
 
 // Implementation
 
-EFI_STATUS InstallPatch_BlLdrLoadImage(IN CONST VOID *originalFunction) {
+EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction) {
   //
   // Install Patch using patching utilities
   // 
