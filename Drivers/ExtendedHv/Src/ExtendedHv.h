@@ -31,11 +31,9 @@
 // Patch type
 // 
 struct patchinfo {
-  void *trampoline;
-  const void *target_function;
-  void *original_function;
-  UINT64 size;
-  unsigned char buffer[48];
+  VOID *original_function;   // Pointer to the original function
+  VOID *target_function;     // Pointer to the hook function  
+  unsigned char buffer[14];  // Backup of original bytes
 };
 typedef struct patchinfo patchinfo_t;
 
