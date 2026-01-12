@@ -8,6 +8,9 @@ extern UINT64 PeGetExport(IN CONST VOID *base, IN CONST CHAR8 *export);
 extern EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 extern EFI_STATUS InstallPatch_BlImgAllocateImageBuffer(IN VOID *originalFunction);
 
+// Public Globals
+// None
+
 // Public Functions
 EFI_STATUS InstallHook_GetVariable(VOID);
 
@@ -61,7 +64,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   UINT64 blImgAllocateImageBufferAddr = 0;
   
   //
-  // Only process SetupMode variable (called from winload.efi)
+  // Only process SetupMode variable
   //
   if (StrCmp(variableName, L"SetupMode")) {
     goto _pass;
@@ -84,26 +87,20 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   // Look for "This program cannot be run in DOS mode" string
   //
   returnAddress = (UINT64)GetReturnAddress();
-  SerialPrintHex("Return address", returnAddress);
-  
   while (CompareMem((VOID*)returnAddress, "This program cannot be run in DOS mode", 38) != 0) {
     returnAddress--;
-    
-    // Safety check - don't scan too far
-    if (returnAddress < 0x100000) {
-      SerialPrint("[!] Failed to find DOS stub\n");
-      goto _pass;
-    }
   }
-  
+
+  //
   // DOS stub is at offset 0x4E from base
+  // 
   moduleBase = returnAddress - 0x4E;
 
   SerialPrint("[+] Found potential winload.efi\n");
   SerialPrintHex("Module Base", moduleBase);
 
   //
-  // Find BlImgAllocateImageBuffer export (must be patched FIRST)
+  // Find BlImgAllocateImageBuffer export
   // 
   blImgAllocateImageBufferAddr = PeGetExport((VOID*)moduleBase, "BlImgAllocateImageBuffer");
   if (!blImgAllocateImageBufferAddr) {
@@ -127,8 +124,8 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   SerialPrintHex("Address", blLdrLoadImageAddr);
 
   //
-  // Install BlImgAllocateImageBuffer patch FIRST
-  // This extends the memory allocation for hv.exe
+  // Install BlImgAllocateImageBuffer patch
+  // This extends the memory allocation to fit our custom section in hv.exe
   //
   SerialPrint("\n[*] Installing allocation hook...\n");
   if (EFI_ERROR(InstallPatch_BlImgAllocateImageBuffer((VOID*)blImgAllocateImageBufferAddr))) {
@@ -155,7 +152,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   gPatchesInstalled = TRUE;
     
   //
-  // Remove our hook - we're done
+  // Remove our hook
   // 
   gRT->GetVariable = gOriginal; 
 

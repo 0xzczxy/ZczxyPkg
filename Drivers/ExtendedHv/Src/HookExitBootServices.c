@@ -2,11 +2,13 @@
 
 // Imports
 extern BOOLEAN gBlLdrLoadImageReached;
+extern BOOLEAN gExtendedAllocation;
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 
 // Public Globals
-// None
+extern BOOLEAN gExtendedAllocation;
+extern BOOLEAN gHvFound;
 
 // Public Functions
 EFI_STATUS InstallHook_ExitBootServices(VOID);
@@ -55,12 +57,21 @@ static EFI_STATUS EFIAPI HookedExitBootServices(IN EFI_HANDLE imageHandle, IN UI
   );
 
   //
-  // Check if winload.efi was patched correctly
+  // Check if hv was found
   // 
-  if (gBlLdrLoadImageReached) {
-    SerialPrint("gBlLdrLoadImageReached TRUE, patch working correctly.\n");
+  if (gHvFound) {
+    SerialPrint("gHvFound TRUE, patch working correctly.\n");
   } else {
-    SerialPrint("gBlLdrLoadImageReached FALSE, patch not working.\n");
+    SerialPrint("gHvFound FALSE, patch not working.\n");
+  }
+
+  //
+  // Check if hv was found
+  // 
+  if (gExtendedAllocation) {
+    SerialPrint("gExtendedAllocation TRUE, patch working correctly.\n");
+  } else {
+    SerialPrint("gExtendedAllocation FALSE, patch not working.\n");
   }
 
   //

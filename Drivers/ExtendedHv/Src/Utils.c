@@ -4,9 +4,15 @@
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 
+// Public Globals
+// None
+
 // Public Functions
 UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern);
 UINT64 FindPattern(IN VOID* base, IN UINTN size, IN CONST CHAR8* pattern);
+
+// Private Globals
+// None
 
 // Private Functions
 static BOOLEAN MatchPattern(IN CONST UINT8* data, IN CONST CHAR8* pattern, IN UINTN patternLen);

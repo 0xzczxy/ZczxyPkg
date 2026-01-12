@@ -5,9 +5,18 @@
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 
+// Public Globals
+// None
+
 // Public Functions
 UINT64 PeGetExport(IN CONST VOID *base, IN CONST CHAR8 *export);
 UINT64 PeAddSection(IN UINT64 imageBase, IN CONST CHAR8* sectionName, IN UINT32 virtualSize, IN UINT32 characteristics);
+
+// Private Globals
+// None
+
+// Private Functions
+// None
 
 // Implementation
 

@@ -11,7 +11,6 @@
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
-// extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 
 // Public Globals
 // None
