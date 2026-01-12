@@ -1,12 +1,15 @@
 #include "ExtendedHv.h"
 
 // Imports
-extern EFI_STATUS InstallHook_LoadImage(VOID);
-extern EFI_STATUS InstallHook_StartImage(VOID);
+extern UINT16 COM1;
+extern VOID EFIAPI SerialPortInitialize(UINT16);
+extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
+extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern EFI_STATUS InstallHook_ExitBootServices(VOID);
+extern EFI_STATUS InstallHook_GetVariable(VOID);
 
 // Public Globals
-_self_state_t gSelfState;
+// None
 
 // Public Functions
 EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE, IN EFI_SYSTEM_TABLE *);
@@ -23,14 +26,9 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
   EFI_EVENT virtualAddressChangeEvent;
 
   //
-  // Initialize context
-  //
-  gSelfState.signature = _SELF_STATE_SIGNATURE;
-
-  //
   // Initialize serial port
   //
-  SerialPortInitialize();
+  SerialPortInitialize(COM1);
 
   //
   // Print Banner
@@ -64,24 +62,6 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
   SerialPrintHex("BootServices", (UINT64)gBS);
   SerialPrintHex("RuntimeServices", (UINT64)gRT);
 
-  // 
-  // Install Hook on LoadImage
-  //
-  status = InstallHook_LoadImage();
-  if (EFI_ERROR(status)) {
-    SerialPrint("[!] Failed to install 'LoadImage' hook: %r\n", status);
-    Print(L"[!] Failed to install 'LoadImage' hook: %r\n", status);
-  }
-
-  //
-  // Install Hook on StartImage
-  // 
-  status = InstallHook_StartImage();
-  if (EFI_ERROR(status)) {
-    SerialPrint("[!] Failed to install 'StartImage' hook: %r\n", status);
-    Print(L"[!] Failed to install 'StartImage' hook: %r\n", status);
-  }
-
   //
   // Install Hook on ExitBootServices
   // 
@@ -90,6 +70,16 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
     SerialPrint("[!] Failed to install 'StartImage' hook: %r\n", status);
     Print(L"[!] Failed to install 'StartImage' hook: %r\n", status);
   }
+
+  //
+  // Install Hook on GetVariable
+  // 
+  status = InstallHook_GetVariable();
+  if (EFI_ERROR(status)) {
+    SerialPrint("[!] Failed to install 'StartImage' hook: %r\n", status);
+    Print(L"[!] Failed to install 'StartImage' hook: %r\n", status);
+  }
+
 
   //
   // Register for virtual address change event
@@ -115,11 +105,6 @@ EFI_STATUS EFIAPI DriverEntry(IN EFI_HANDLE imageHandle, IN EFI_SYSTEM_TABLE *sy
   
   SerialPrint("[+] Driver initialization complete\n");
   SerialPrint("[*] Waiting for boot process to continue...\n\n");
-
-  // 
-  // Set Checkpoint
-  // 
-  gSelfState.checkpoint = SSTATE_CHECKPOINT_LOADED;
 
   //
   // Return Status

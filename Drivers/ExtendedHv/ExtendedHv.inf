@@ -8,18 +8,14 @@
 
 [Sources]
   Src/Main.c
-  Src/HookStartImage.c
-  Src/HookLoadImage.c
   Src/HookExitBootServices.c
-  Src/PatchBootmgfwEfi.c
-  Src/PatchWinloadEfi.c
-  Src/Utils.c
+  Src/HookGetVariable.c
+  Src/Pe.c
+  Src/SerialPrint.c
 
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
-  PrintPkg/PrintPkg.dec
-  PatchPkg/PatchPkg.dec
 
 [LibraryClasses]
   UefiDriverEntryPoint
@@ -33,9 +29,6 @@
   MemoryAllocationLib
   IoLib
   DevicePathLib
-  SerialPrintLib
-  PatchLib
-  PatchWinLib
 
 [Protocols]
   gEfiLoadedImageProtocolGuid
