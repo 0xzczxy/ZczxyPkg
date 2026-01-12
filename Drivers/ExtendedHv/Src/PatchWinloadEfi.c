@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "ExtendedHv.h"
+#include "WinDefines.h"
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
@@ -70,9 +71,9 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Get arguments
   // 
-  CHAR16* imagePath = (CHAR16*)arg3;
+  // CHAR16* imagePath = (CHAR16*)arg3;
   CHAR16* imageName = (CHAR16*)arg4;
-  const PLDR_DATA_TABLE_ENTRY entry = *(PPLDR_DATA_TABLE_ENTRY)arg9;
+  // const PLDR_DATA_TABLE_ENTRY entry = *(PPLDR_DATA_TABLE_ENTRY)arg9;
 
   //
   // Compare image name to filter for hypervisor
