@@ -37,6 +37,8 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   VOID* arg8, VOID* arg9, VOID* arg10, VOID* arg11, VOID* arg12, VOID* arg13,
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
 ) {
+  SerialPrint("Hook Entered.\n");
+
   //
   // Call the original function
   // 
@@ -48,15 +50,21 @@ static EFI_STATUS PatchedBlLdrLoadImage(
     (arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
   ;
 
+  SerialPrint("Trampoline Returned.\n");
+
   //
   // Check the function completed properly
   // 
   if (EFI_ERROR(status)) return status;
 
+  SerialPrint("Completed successfully.\n");
+
   //
   // Set global so that exit boot services can know we got here
   // 
   gBlLdrLoadImageReached = TRUE;
+
+  SerialPrint("Wrote to BlLdrLoadImageReached.\n");
 
   return status;
 }

@@ -76,7 +76,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   moduleBase = returnAddress - 0x4E;
 
   SerialPrint("Found potential winload.efi\n");
-  SerialPrintHex("Module Base: %lu\n", moduleBase);
+  SerialPrintHex("Module Base", moduleBase);
 
   //
   // Find BlLdrLoadImage through export table (more reliable then pattern searching)
