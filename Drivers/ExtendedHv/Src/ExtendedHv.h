@@ -27,34 +27,15 @@
 #define ALIGN_UP(Value, Alignment) \
   (((Value) + (Alignment) - 1) & ~((Alignment) - 1))
 
+//
+// Patch type
 // 
-// Iternal State of Being
-//
-// #define _SELF_STATE_SIGNATURE SIGNATURE_32('E','X','H','V') // Extend Hyper Visor
-// struct _self_state {
-//   // Validation of State
-//   UINT32 signature;
-
-//   // Validation of Services
-//   UINT64 checkpoint; // Checkpoints Reached
-// };
-// typedef struct _self_state _self_state_t;
-
-// extern _self_state_t gSelfState;
-
-//
-// Status Codes
-//
-// #define SSTATE_CHECKPOINT_NULL     0        // Nothing Has been done
-// #define SSTATE_CHECKPOINT_LOADED   (1 << 1) // DriverEntry has finished
-
-//
-// Types
-// 
-// typedef struct {
-//   UINT64 low;
-//   UINT64 high;
-// } INT128_t;
-
+struct patchinfo {
+  void *trampoline;
+  void *target_function;
+  void *original_function;
+  unsigned char original_buffer[48];
+};
+typedef struct patchinfo patchinfo_t;
 
 #endif // __EXTENDEDHV_H

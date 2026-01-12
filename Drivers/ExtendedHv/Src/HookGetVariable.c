@@ -74,7 +74,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   }
   moduleBase = returnAddress - 0x4E;
 
-  SerialPrint("Found winload.efi\n");
+  SerialPrint("Found potential winload.efi\n");
   SerialPrintHex("Module Base: %lu\n", moduleBase);
 
   //
@@ -85,12 +85,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   SerialPrint("Found export 'BlLdrLoadImage'\n");
 
   //
-  // TODO: Create Hook
-  // 
-
-
-  //
-  // TODO: Enable Hook
+  // Patch Winload
   // 
   
 
