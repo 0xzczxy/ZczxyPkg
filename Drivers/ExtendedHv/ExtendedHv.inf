@@ -8,12 +8,15 @@
 
 [Sources]
   Src/Main.c
-  Src/HookExitBootServices.c
-  Src/HookGetVariable.c
-  Src/PatchWinloadEfi.c
+  Src/SerialPrint.c
   Src/Patch.c
   Src/Pe.c
-  Src/SerialPrint.c
+  Src/Utils.c
+  Src/Payload.c
+  Src/HookExitBootServices.c
+  Src/HookGetVariable.c
+  Src/PatchBlLdrLoadImage.c
+  Src/PatchBlImgAllocateImageBuffer.c
 
 [Packages]
   MdePkg/MdePkg.dec
@@ -21,9 +24,9 @@
 
 [LibraryClasses]
   UefiDriverEntryPoint
+  UefiLib
   UefiBootServicesTableLib
   UefiRuntimeServicesTableLib
-  UefiLib
   BaseLib
   BaseMemoryLib
   DebugLib
@@ -40,7 +43,11 @@
   gEfiEventVirtualAddressChangeGuid
 
 [BuildOptions]
-  GCC:*_*_*_CC_FLAGS = -Wno-missing-braces -fno-stack-protector -fno-builtin
+  # Position-independent code for payload relocation
+  GCC:*_*_*_CC_FLAGS = -fPIC -fno-stack-protector -mno-red-zone
+  
+  # Keep payload sections together
+  GCC:*_*_*_DLINK_FLAGS = -z max-page-size=0x1000
 
 [Depex]
   TRUE
