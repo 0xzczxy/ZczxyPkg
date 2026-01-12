@@ -89,8 +89,10 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   // Patch Winload
   // 
   if (EFI_ERROR(InstallPatch_BlLdrLoadImage((VOID*)blLdrLoadImageAddr))) {
-    SerialPrint("Failed to patch BlLdrLoadImage\n");
+    SerialPrint("Failed to patch BlLdrLoadImage.\n");
     // Don't jump, we have done our hook work so we let it end.
+  } else {
+    SerialPrint("Patched BlLdrLoadImage successfully.\n");
   }
     
   //
