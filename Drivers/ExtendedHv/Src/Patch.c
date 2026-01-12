@@ -53,6 +53,7 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   //
   // Store metadata for later restoration
   //
+  info->trampoline = info->buffer; // trampoline is basically an alias (consider fixing this by chaning buffer to be called trampoline)
   info->original_function = originalFunction;
   info->target_function = targetFunction;
   info->size = size;
