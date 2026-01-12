@@ -24,6 +24,12 @@
         __writecr0(cr0);
     }
 
+    static inline VOID FlushInstructionCache(VOID *address, UINTN size)
+    {
+        // Serialize instruction execution
+        __cpuid((int*)address, 0);
+    }
+
 #elif defined(__GNUC__)
     /* GCC Inline Assembly */
 
@@ -56,6 +62,17 @@
             : "=&r" (cr0)
             : "r" (mask)
             : "memory"
+        );
+    }
+
+    static inline VOID FlushInstructionCache(VOID *address, UINTN size)
+    {
+        __asm__ volatile(
+            "mfence\n\t"           // Memory fence
+            "cpuid\n\t"            // Serializing instruction
+            :
+            :
+            : "rax", "rbx", "rcx", "rdx", "memory"
         );
     }
 
