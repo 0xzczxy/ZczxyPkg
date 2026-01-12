@@ -64,7 +64,7 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Check if we have already reached and found the hypervisor
   // 
-  if (!gBlLdrLoadImageReached) {
+  if (gBlLdrLoadImageReached) {
     return status;
   }
 
