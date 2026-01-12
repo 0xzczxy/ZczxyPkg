@@ -60,13 +60,6 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   UINT64 moduleBase = 0;
   UINT64 blLdrLoadImageAddr = 0;
   
-  SerialPrint(
-    "\n"
-    "========================================\n"
-    "  GetVariable Called  \n"
-    "========================================\n"
-  );
-
   //
   // Setup mode variable is called within winload.efi
   //
@@ -89,6 +82,7 @@ static EFI_STATUS EFIAPI HookedGetVariable(
   // 
   blLdrLoadImageAddr = PeGetExport((VOID*)moduleBase, "BlLdrLoadImage");
   if (!blLdrLoadImageAddr) goto _pass;
+  SerialPrint("Found export 'BlLdrLoadImage'\n");
 
   //
   // TODO: Create Hook
