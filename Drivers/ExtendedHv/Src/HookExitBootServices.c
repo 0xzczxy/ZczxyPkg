@@ -1,6 +1,7 @@
 #include "ExtendedHv.h"
 
 // Imports
+extern BOOLEAN gBlLdrLoadImageReached;
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 
@@ -52,6 +53,15 @@ static EFI_STATUS EFIAPI HookedExitBootServices(IN EFI_HANDLE imageHandle, IN UI
     "  ExitBootServices Called  \n"
     "========================================\n"
   );
+
+  //
+  // Check if winload.efi was patched correctly
+  // 
+  if (gBlLdrLoadImageReached) {
+    SerialPrint("gBlLdrLoadImageReached TRUE, patch working correctly.\n");
+  } else {
+    SerialPrint("gBlLdrLoadImageReached FALSE, patch not working.\n");
+  }
 
   //
   // Pass through to original
