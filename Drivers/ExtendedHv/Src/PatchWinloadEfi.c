@@ -73,6 +73,7 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
 ) {
   SerialPrint("Hook Entered.\n");
+  SerialPrint("gBlLdrLoadImagePatchInfo: 0x%p\n", &gBlLdrLoadImagePatchInfo);
   SerialPrintHex("Trampoline Address", (UINT64)gBlLdrLoadImagePatchInfo->trampoline);
   SerialPrint("Size copied: %u bytes.\n", gBlLdrLoadImagePatchInfo->size);
 
