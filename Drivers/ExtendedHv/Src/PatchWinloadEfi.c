@@ -39,9 +39,10 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   VOID* arg14, VOID* arg15, VOID* arg16, VOID* arg17
 ) {
   EFI_STATUS status;
+  VOID *originalFunctionAddr = gBlLdrLoadImagePatchInfo.original_function;
   
   SerialPrint("Hook Entered.\n");
-  
+
   //
   // Temporarily uninstall the patch to call the original function
   //
@@ -54,7 +55,7 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   status =
     (
       (EFI_STATUS(*)(VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*))
-      gBlLdrLoadImagePatchInfo.original_function
+      originalFunctionAddr
     )
     (arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
   ;
@@ -79,11 +80,7 @@ _exit:
   //
   // Reinstall the patch for next call
   //
-  InstallPatch(
-    &gBlLdrLoadImagePatchInfo, 
-    gBlLdrLoadImagePatchInfo.original_function, 
-    PatchedBlLdrLoadImage
-  );
+  InstallPatch(&gBlLdrLoadImagePatchInfo, originalFunctionAddr, PatchedBlLdrLoadImage);
   SerialPrint("Patch reinstalled.\n");
 
   return status;
