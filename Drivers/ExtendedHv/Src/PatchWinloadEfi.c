@@ -8,7 +8,7 @@ extern EFI_STATUS InstallPatch(patchinfo_t *info, void *originalFunction, void *
 
 // Public Globals
 BOOLEAN gBlLdrLoadImageReached = FALSE;
-__attribute__((section(".text"))) patchinfo_t gBlLdrLoadImagePatchInfo = {0};
+patchinfo_t *gBlLdrLoadImagePatchInfo = NULL;  // Changed to pointer for dynamic allocation
 
 // Public Functions
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
@@ -26,10 +26,45 @@ static EFI_STATUS PatchedBlLdrLoadImage(
 // Implementation
 
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction) {
+  EFI_STATUS status;
+  
+  //
+  // Allocate executable memory for patch info (including trampoline buffer)
+  // EfiBootServicesCode allocates memory from executable regions
+  //
+  if (gBlLdrLoadImagePatchInfo == NULL) {
+    status = gBS->AllocatePool(
+      EfiBootServicesCode,  // Executable memory type
+      sizeof(patchinfo_t),
+      (VOID**)&gBlLdrLoadImagePatchInfo
+    );
+    
+    if (EFI_ERROR(status)) {
+      SerialPrint("[!] Failed to allocate executable memory for patchinfo: %r\n", status);
+      return status;
+    }
+    
+    // Zero the structure
+    SetMem(gBlLdrLoadImagePatchInfo, sizeof(patchinfo_t), 0);
+    
+    SerialPrint("[+] Allocated executable memory for patchinfo\n");
+    SerialPrintHex("patchinfo Address", (UINT64)gBlLdrLoadImagePatchInfo);
+    SerialPrintHex("Trampoline Buffer", (UINT64)gBlLdrLoadImagePatchInfo->buffer);
+  }
+  
   //
   // Install Patch using patching utilities
   // 
-  return InstallPatch(&gBlLdrLoadImagePatchInfo, originalFunction, PatchedBlLdrLoadImage);
+  status = InstallPatch(gBlLdrLoadImagePatchInfo, originalFunction, PatchedBlLdrLoadImage);
+  
+  if (EFI_ERROR(status)) {
+    SerialPrint("[!] InstallPatch failed: %r\n", status);
+    // Free the allocated memory on failure
+    gBS->FreePool(gBlLdrLoadImagePatchInfo);
+    gBlLdrLoadImagePatchInfo = NULL;
+  }
+  
+  return status;
 }
 
 static EFI_STATUS PatchedBlLdrLoadImage(
@@ -38,16 +73,16 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
 ) {
   SerialPrint("Hook Entered.\n");
-  SerialPrintHex("Trampoline Address", (UINT64)gBlLdrLoadImagePatchInfo.trampoline);
-  SerialPrint("Size copied: %u bytes.\n", gBlLdrLoadImagePatchInfo.size);
+  SerialPrintHex("Trampoline Address", (UINT64)gBlLdrLoadImagePatchInfo->trampoline);
+  SerialPrint("Size copied: %u bytes.\n", gBlLdrLoadImagePatchInfo->size);
 
   //
-  // Call the original function
+  // Call the original function via trampoline
   // 
   const EFI_STATUS status =
     (
       (EFI_STATUS(*)(VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*, VOID*))
-      gBlLdrLoadImagePatchInfo.trampoline
+      gBlLdrLoadImagePatchInfo->trampoline
     )
     (arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
   ;
@@ -70,4 +105,3 @@ static EFI_STATUS PatchedBlLdrLoadImage(
 
   return status;
 }
-

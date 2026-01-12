@@ -26,8 +26,17 @@
 
     static inline VOID FlushInstructionCache(VOID *address, UINTN size)
     {
-        // Serialize instruction execution
-        __cpuid((int*)address, 0);
+        int cpuInfo[4];
+        UINTN offset;
+        
+        // Flush cache lines (64-byte aligned)
+        for (offset = 0; offset < size; offset += 64) {
+            _mm_clflush((void*)((UINT64)address + offset));
+        }
+        
+        // Memory fence and serialization
+        _mm_mfence();
+        __cpuid(cpuInfo, 0);
     }
 
 #elif defined(__GNUC__)
@@ -67,9 +76,26 @@
 
     static inline VOID FlushInstructionCache(VOID *address, UINTN size)
     {
+        UINT64 addr = (UINT64)address;
+        UINT64 end = addr + size;
+        
+        // Align to cache line boundary (64 bytes)
+        addr &= ~63ULL;
+        
+        // Flush all cache lines covering the range
+        for (; addr < end; addr += 64) {
+            __asm__ volatile(
+                "clflush (%0)\n\t"
+                :
+                : "r" (addr)
+                : "memory"
+            );
+        }
+        
+        // Memory fence and serialize instruction execution
         __asm__ volatile(
-            "mfence\n\t"           // Memory fence
-            "cpuid\n\t"            // Serializing instruction
+            "mfence\n\t"
+            "cpuid\n\t"
             :
             :
             : "rax", "rbx", "rcx", "rdx", "memory"

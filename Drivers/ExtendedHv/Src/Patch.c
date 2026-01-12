@@ -53,9 +53,6 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   // Keep adding instruction sizes until we have at least 14 bytes (size of JUMP_CODE).
   // Maximum x86-64 instruction is 15 bytes, so worst case is 15 + 14 = 29 bytes.
   //
-  // while (size < sizeof(JUMP_CODE))
-  //   size += GetInstructionSize((unsigned char*)originalFunction + size)
-  // ;
   SerialPrint("Starting instruction size calculation, need >= %u bytes\n", sizeof(JUMP_CODE));
 
   while (size < sizeof(JUMP_CODE)) {
@@ -64,6 +61,8 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   
     if (instrSize == 0 || instrSize > 15) {
       SerialPrint("  ERROR: Invalid instruction size!\n");
+      EnableMemoryProtection();
+      EnableInterrupts();
       return EFI_INVALID_PARAMETER;
     }
   
@@ -72,6 +71,8 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   
     if (iterations > 10) {
       SerialPrint("  ERROR: Too many iterations!\n");
+      EnableMemoryProtection();
+      EnableInterrupts();
       return EFI_INVALID_PARAMETER;
     }
   }
@@ -81,7 +82,7 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   //
   // Store metadata for later restoration
   //
-  info->trampoline = info->buffer; // trampoline is basically an alias (consider fixing this by chaning buffer to be called trampoline)
+  info->trampoline = info->buffer; // trampoline is basically an alias (consider fixing this by changing buffer to be called trampoline)
   info->original_function = originalFunction;
   info->target_function = targetFunction;
   info->size = size;
@@ -97,6 +98,12 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   //
   CREATE_JUMP(originalJump, (unsigned char*)originalFunction + size);
   CopyMem(info->buffer + size, originalJump, sizeof(JUMP_CODE));
+  
+  //
+  // CRITICAL: Flush instruction cache for trampoline
+  // The trampoline buffer must have coherent i-cache before execution
+  //
+  FlushInstructionCache(info->buffer, size + sizeof(JUMP_CODE));
 
   //
   // Step 2: Create jump from original function to our hook function.
@@ -104,13 +111,18 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   //
   CREATE_JUMP(hookJump, targetFunction);
   CopyMem(originalFunction, hookJump, sizeof(JUMP_CODE));
+  
+  //
+  // CRITICAL: Flush instruction cache for patched function
+  // Ensure the CPU fetches the new jump instruction
+  //
+  FlushInstructionCache(originalFunction, sizeof(JUMP_CODE));
 
   //
   // Restore CPU protection mechanisms
   //
   EnableMemoryProtection();
   EnableInterrupts();
-  FlushInstructionCache();
 
   SerialPrint(
     "Patch installed: 0x%p -> 0x%p (trampoline: 0x%p)\n", 
@@ -135,6 +147,11 @@ EFI_STATUS UninstallPatch(IN OUT patchinfo_t *info) {
   // This overwrites the jump instruction, removing the hook
   //
   CopyMem(info->original_function, info->buffer, info->size);
+  
+  //
+  // CRITICAL: Flush instruction cache after restoring original code
+  //
+  FlushInstructionCache(info->original_function, info->size);
 
   //
   // Clear metadata
@@ -148,7 +165,6 @@ EFI_STATUS UninstallPatch(IN OUT patchinfo_t *info) {
   //
   EnableMemoryProtection();
   EnableInterrupts();
-  FlushInstructionCache();
 
   SerialPrint("Patch uninstalled\n");
 
@@ -250,4 +266,3 @@ static void ParseModRM(unsigned char** buffer, const int addressPrefix) {
   } else if (addressPrefix && modRm == 0x26)
       *buffer += 2;
 }
-
