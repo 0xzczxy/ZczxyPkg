@@ -77,12 +77,6 @@ EFI_STATUS UninstallPatch(IN OUT patchinfo_t *info) {
   CopyMem(info->original_function, info->buffer, sizeof(JUMP_CODE));
 
   //
-  // Clear metadata
-  //
-  info->original_function = NULL;
-  info->target_function = NULL;
-
-  //
   // Restore CPU protection mechanisms
   //
   EnableMemoryProtection();
