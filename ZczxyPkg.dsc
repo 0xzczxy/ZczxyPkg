@@ -31,17 +31,12 @@
 
   # I/O Library
   IoLib|MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsic.inf
-  SerialPrintLib|PrintPkg/Library/SerialPrintLib/SerialPrintLib.inf
 
   # Utility libraries
   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
   DebugLib|MdePkg/Library/UefiDebugLibConOut/UefiDebugLibConOut.inf
   DebugPrintErrorLevelLib|MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf
   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
-
-  # Patching Libraries
-  PatchLib|PatchPkg/Library/PatchLib/PatchLib.inf
-  PatchWinLib|PatchPkg/Library/PatchWinLib/PatchWinLib.inf
 
 [Components]
   ZczxyPkg/Drivers/ExtendedHv/ExtendedHv.inf
