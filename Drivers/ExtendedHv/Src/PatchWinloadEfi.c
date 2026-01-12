@@ -8,7 +8,7 @@ extern EFI_STATUS InstallPatch(patchinfo_t *info, void *originalFunction, void *
 
 // Public Globals
 BOOLEAN gBlLdrLoadImageReached = FALSE;
-patchinfo_t gBlLdrLoadImagePatchInfo = {0};
+__attribute__((section(".text"))) patchinfo_t gBlLdrLoadImagePatchInfo = {0};
 
 // Public Functions
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
