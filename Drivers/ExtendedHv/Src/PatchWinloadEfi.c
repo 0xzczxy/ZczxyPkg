@@ -8,13 +8,12 @@ extern EFI_STATUS InstallPatch(patchinfo_t *info, void *originalFunction, void *
 
 // Public Globals
 BOOLEAN gBlLdrLoadImageReached = FALSE;
-patchinfo_t gBlLdrLoadImagePatchInfo;
 
 // Public Functions
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 
 // Private Globals
-// None
+__attribute__((section(".text"))) static patchinfo_t gBlLdrLoadImagePatchInfo;
 
 // Private Functions
 static EFI_STATUS PatchedBlLdrLoadImage(
@@ -49,6 +48,11 @@ static EFI_STATUS PatchedBlLdrLoadImage(
   SerialPrint("[+] gBlLdrLoadImagePatchInfo: 0x%p\n", &gBlLdrLoadImagePatchInfo);
   SerialPrint("[+] Trampoline Address: 0x%p\n", gBlLdrLoadImagePatchInfo.trampoline);
   SerialPrint("[+] Size copied: %u bytes.\n", gBlLdrLoadImagePatchInfo.size);
+
+  SerialPrint(
+    "[+] Trampoline byte 0 - %02x.\n",
+    ((unsigned char *)gBlLdrLoadImagePatchInfo.trampoline)[0]
+  );
 
   //
   // Call the original function via trampoline
