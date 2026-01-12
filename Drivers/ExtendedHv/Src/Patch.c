@@ -36,19 +36,47 @@ static void ParseModRM(unsigned char** buffer, const int addressPrefix);
 // Implementation
 
 EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CONST VOID *targetFunction) {
+  unsigned int size = 0;
+  unsigned int iterations = 0;
+
   if (!info || !originalFunction || !targetFunction)
     return EFI_INVALID_PARAMETER;
 
-  unsigned int size = 0;
+  //
+  // Disable interrupts and write protection for kernel-mode code modification
+  //
+  DisableInterrupts();
+  DisableMemoryProtection();
 
   //
   // Calculate how many bytes we need to replace with the jump instruction.
   // Keep adding instruction sizes until we have at least 14 bytes (size of JUMP_CODE).
   // Maximum x86-64 instruction is 15 bytes, so worst case is 15 + 14 = 29 bytes.
   //
-  while (size < sizeof(JUMP_CODE))
-    size += GetInstructionSize((unsigned char*)originalFunction + size)
-  ;
+  // while (size < sizeof(JUMP_CODE))
+  //   size += GetInstructionSize((unsigned char*)originalFunction + size)
+  // ;
+  SerialPrint("Starting instruction size calculation, need >= %u bytes\n", sizeof(JUMP_CODE));
+
+  while (size < sizeof(JUMP_CODE)) {
+    unsigned int instrSize = GetInstructionSize((unsigned char*)originalFunction + size);
+    SerialPrint("  Iteration %u: offset=%u, instrSize=%u\n", iterations, size, instrSize);
+  
+    if (instrSize == 0 || instrSize > 15) {
+      SerialPrint("  ERROR: Invalid instruction size!\n");
+      return EFI_INVALID_PARAMETER;
+    }
+  
+    size += instrSize;
+    iterations++;
+  
+    if (iterations > 10) {
+      SerialPrint("  ERROR: Too many iterations!\n");
+      return EFI_INVALID_PARAMETER;
+    }
+  }
+
+  SerialPrint("Final size: %u bytes in %u iterations\n", size, iterations);
 
   //
   // Store metadata for later restoration
@@ -69,12 +97,6 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   //
   CREATE_JUMP(originalJump, (unsigned char*)originalFunction + size);
   CopyMem(info->buffer + size, originalJump, sizeof(JUMP_CODE));
-
-  //
-  // Disable interrupts and write protection for kernel-mode code modification
-  //
-  DisableInterrupts();
-  DisableMemoryProtection();
 
   //
   // Step 2: Create jump from original function to our hook function.
