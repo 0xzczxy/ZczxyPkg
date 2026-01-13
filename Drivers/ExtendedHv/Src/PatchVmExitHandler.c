@@ -387,10 +387,12 @@ EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
     SerialPrint("================================================\n\n");
     return status;
   }
-  
-  SerialPrint("\n[+] VM Exit Handler successfully hooked (%s)\n", 
-              (arch == HV_ARCH_INTEL) ? "Intel" : "AMD");
-  SerialPrint("================================================\n\n");
+
+  if (arch == HV_ARCH_INTEL) {
+    SerialPrint("\n[+] VM Exit Handler successfully hooked Intel\n");
+  } else {
+    SerialPrint("\n[+] VM Exit Handler successfully hooked AMD\n");
+  }
   
   return EFI_SUCCESS;
 }
