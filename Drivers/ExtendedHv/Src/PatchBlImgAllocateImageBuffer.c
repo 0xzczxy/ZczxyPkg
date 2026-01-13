@@ -1,7 +1,6 @@
 #include "Compiler.h"
 #include "ExtendedHv.h"
 #include "WinDefines.h"
-#include "Payload.h"
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
@@ -61,14 +60,12 @@ static UINT64 EFIAPI PatchedBlImgAllocateImageBuffer(
   VOID* unknown1, 
   VOID* unknown2
 ) {
-  UINTN originalSize = imageSize;
-
   //
   // Check if this is the hypervisor image allocation
   // The hypervisor has a specific attribute value
   //
   if (attributes == ATTRIBUTE_HV_IMAGE && !gExtendedAllocation) {
-    UINTN payloadSize = GetPayloadSize();
+    UINTN payloadSize = 100; // TODO: Get payload size...
     
     //
     // Extend allocation to include our payload

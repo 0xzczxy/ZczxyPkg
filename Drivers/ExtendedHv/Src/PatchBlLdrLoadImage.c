@@ -1,7 +1,6 @@
 #include "Compiler.h"
 #include "ExtendedHv.h"
 #include "WinDefines.h"
-#include "Payload.h"
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
@@ -25,7 +24,7 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   VOID* arg8, VOID* arg9, VOID* arg10, VOID* arg11, VOID* arg12, VOID* arg13,
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
 );
-static VOID ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize);
+static EFI_STATUS ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize);
 
 // Implementation
 
@@ -103,7 +102,9 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Process hv.exe
   //
-  ProcessHvImage(entry->ModuleBase, entry->SizeOfImage);
+  if (EFI_ERROR(ProcessHvImage(entry->ModuleBase, entry->SizeOfImage))) {
+    // TODO: Report error
+  }
 
   return status;
 }

@@ -12,7 +12,6 @@
   Src/Patch.c
   Src/Pe.c
   Src/Utils.c
-  Src/Payload.c
   Src/HookExitBootServices.c
   Src/HookGetVariable.c
   Src/PatchBlLdrLoadImage.c

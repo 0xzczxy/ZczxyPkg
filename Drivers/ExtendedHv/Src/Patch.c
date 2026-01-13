@@ -36,7 +36,6 @@ static void ParseModRM(unsigned char** buffer, const int addressPrefix);
 
 EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CONST VOID *targetFunction) {
   unsigned int size = 0;
-  unsigned int iterations = 0;
 
   if (!info || !originalFunction || !targetFunction)
     return EFI_INVALID_PARAMETER;
@@ -52,31 +51,10 @@ EFI_STATUS InstallPatch(OUT patchinfo_t *info, IN VOID *originalFunction, IN CON
   // Keep adding instruction sizes until we have at least 14 bytes (size of JUMP_CODE).
   // Maximum x86-64 instruction is 15 bytes, so worst case is 15 + 14 = 29 bytes.
   //
-  SerialPrint("Starting instruction size calculation, need >= %u bytes\n", sizeof(JUMP_CODE));
-
   while (size < sizeof(JUMP_CODE)) {
-    unsigned int instrSize = GetInstructionSize((unsigned char*)originalFunction + size);
-    SerialPrint("  Iteration %u: offset=%u, instrSize=%u\n", iterations, size, instrSize);
-  
-    if (instrSize == 0 || instrSize > 15) {
-      SerialPrint("  ERROR: Invalid instruction size!\n");
-      EnableMemoryProtection();
-      EnableInterrupts();
-      return EFI_INVALID_PARAMETER;
-    }
-  
-    size += instrSize;
-    iterations++;
-  
-    if (iterations > 10) {
-      SerialPrint("  ERROR: Too many iterations!\n");
-      EnableMemoryProtection();
-      EnableInterrupts();
-      return EFI_INVALID_PARAMETER;
-    }
+    size += GetInstructionSize((unsigned char*)originalFunction + size);
   }
-
-  SerialPrint("Final size: %u bytes in %u iterations\n", size, iterations);
+  SerialPrint("Final size: %u bytes\n", size);
 
   //
   // Store metadata for later restoration
