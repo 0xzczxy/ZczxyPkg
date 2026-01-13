@@ -1,11 +1,6 @@
 #include "ExtendedHv.h"
 #include "Compiler.h"
 #include "WinDefines.h"
-
-//
-// Check Payload/README.md for instructions to compile
-// 
-
 #include "../Payload/payload_data.h"
 
 #define HV_ARCH_UNKNOWN 0
@@ -17,394 +12,301 @@ extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern UINT64 PeAddSection(IN UINT64 imageBase, IN CONST CHAR8* sectionName, IN UINT32 virtualSize, IN UINT32 characteristics);
 extern UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern);
-
-// Public Globals
-// None
+extern UINT64 FindPattern(IN VOID* base, IN UINTN size, IN CONST CHAR8* pattern);
 
 // Public Functions
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize);
 UINT64 PatchSizeVmExitHandler(VOID);
 
-// Private Globals
-// None
-
 // Private Functions
-static int DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize);
+static int DetectHyperVArchitecture(IN VOID* imageBase);
 static EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section);
 static EFI_STATUS PatchVmExitHandler_Amd(IN UINT64 imageBase, IN UINT64 section);
-static UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 searchRadius);
-
+static VOID ApplyPatch(IN UINT64 callAddr, IN UINT64 section, IN INT32 arch);
 
 // Implementation
 UINT64 PatchSizeVmExitHandler(VOID) {
   return PAYLOAD_SIZE;
 }
 
-static int DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize) {
-  // AMD detection: Look for VMRUN instruction (0F 01 D8)
-  if (FindPatternImage(imageBase, "0F 01 D8") != 0) {
-    SerialPrint("[*] Detected AMD Hyper-V (hvax64.exe) - VMRUN instruction found\n");
-    return HV_ARCH_AMD;
-  }
-  
-  // Intel detection: Look for VMRESUME (0F 01 C3) or VMREAD (0F 78)
-  if (FindPatternImage(imageBase, "0F 01 C3") != 0 || FindPatternImage(imageBase, "0F 78") != 0) {
-    SerialPrint("[*] Detected Intel Hyper-V (hvix64.exe) - VM instructions found\n");
+static int DetectHyperVArchitecture(IN VOID* imageBase) {
+  // Intel: Look for VMRESUME
+  if (FindPatternImage(imageBase, "0F 01 C3") != 0) {
+    SerialPrint("[+] Detected Intel VT-x (found VMRESUME)\n");
     return HV_ARCH_INTEL;
   }
   
+  // AMD: Look for VMRUN
+  if (FindPatternImage(imageBase, "0F 01 D8") != 0) {
+    SerialPrint("[+] Detected AMD-V (found VMRUN)\n");
+    return HV_ARCH_AMD;
+  }
+  
+  SerialPrint("[!] Could not detect hypervisor architecture\n");
   return HV_ARCH_UNKNOWN;
 }
 
-//
-// Helper function to find CALL instruction before a given address
-// Searches backwards from instructionAddr for E8 (CALL rel32)
-//
-static UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 searchRadius) {
-  UINT64 searchStart = (instructionAddr > searchRadius) ? (instructionAddr - searchRadius) : 0;
-  UINT64 lastCall = 0;
-  
-  for (UINT64 offset = searchStart; offset < instructionAddr; offset++) {
-    if (*(UINT8*)offset == 0xE8) {  // CALL rel32 opcode
-      lastCall = offset;
-    }
-  }
-  
-  return lastCall;
-}
-
-//
-// Intel VM Exit Handler Patching
-// Multiple pattern strategies based on the article
-//
-static EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section) {
-  UINT64 scan = 0;
-  UINT64 callScan = 0;
-  
-  SerialPrint("[*] Attempting Intel-specific VM exit handler patch...\n");
-  
-  //
-  // Strategy 1: Search for VMRESUME (0F 01 C3) and look backwards for CALL
-  // This is the most reliable method according to the article
-  //
-  SerialPrint("[*] Strategy 1: Searching for VMRESUME instruction...\n");
-  scan = FindPatternImage((VOID*)imageBase, "0F 01 C3");
-  
-  if (scan) {
-    SerialPrint("[+] Found VMRESUME at 0x%p\n", scan);
-    
-    // Look backwards for CALL instruction (typically within 256 bytes)
-    callScan = FindCallBeforeInstruction(scan, 256);
-    
-    if (callScan) {
-      SerialPrint("[+] Found CALL before VMRESUME at 0x%p\n", callScan);
-      goto patch_call;
-    }
-    SerialPrint("[!] No CALL found before VMRESUME, trying next strategy...\n");
-  }
-  
-  //
-  // Strategy 2: Search for VMCS_HOST_RIP field (0x6C16)
-  // Then look for nearby VMWRITE instruction and CALL
-  //
-  SerialPrint("[*] Strategy 2: Searching for VMCS_HOST_RIP (0x6C16)...\n");
-  scan = FindPatternImage((VOID*)imageBase, "66 B9 16 6C");  // mov cx, 0x6C16
-  
-  if (!scan) {
-    scan = FindPatternImage((VOID*)imageBase, "41 B9 16 6C 00 00");  // mov r9d, 0x6C16
-  }
-  
-  if (scan) {
-    SerialPrint("[+] Found VMCS_HOST_RIP reference at 0x%p\n", scan);
-    
-    // Look forward for VMWRITE (0F 79) then backwards for CALL
-    UINT64 vmwriteScan = 0;
-    for (UINT64 offset = scan; offset < scan + 512; offset++) {
-      if (*(UINT16*)offset == 0x790F) {  // VMWRITE
-        vmwriteScan = offset;
-        break;
-      }
-    }
-    
-    if (vmwriteScan) {
-      SerialPrint("[+] Found VMWRITE at 0x%p\n", vmwriteScan);
-      callScan = FindCallBeforeInstruction(vmwriteScan, 256);
-      
-      if (callScan) {
-        SerialPrint("[+] Found CALL before VMWRITE at 0x%p\n", callScan);
-        goto patch_call;
-      }
-    }
-    SerialPrint("[!] Could not locate CALL, trying next strategy...\n");
-  }
-  
-  //
-  // Strategy 3: Original method - VMREAD and backwards scan
-  //
-  SerialPrint("[*] Strategy 3: Searching for VMREAD instruction...\n");
-  scan = FindPatternImage((VOID*)imageBase, "0F 78");
-  
-  if (scan) {
-    SerialPrint("[+] Found VMREAD at 0x%p\n", scan);
-    callScan = FindCallBeforeInstruction(scan, 256);
-    
-    if (callScan) {
-      SerialPrint("[+] Found CALL before VMREAD at 0x%p\n", callScan);
-      goto patch_call;
-    }
-  }
-  
-  SerialPrint("[!] All Intel strategies exhausted. Unable to locate VM exit handler.\n");
-  return EFI_UNSUPPORTED;
-
-patch_call:
-  //
-  // Calculate addresses for patching
-  //
-  const UINT64 callInstructionBase = callScan + 5;
-  const INT32 originalOffset = *(INT32*)(callScan + 1);
-  const UINT64 originalFunction = callInstructionBase + originalOffset;
+static VOID ApplyPatch(IN UINT64 callAddr, IN UINT64 section, IN INT32 arch) {
+  const UINT64 callBase = callAddr + 5;
+  const INT32 originalOffset = *(INT32*)(callAddr + 1);
+  const UINT64 originalFunction = callBase + originalOffset;
   const UINT64 hookedFunction = section + PAYLOAD_FUNCTION_OFFSET;
-  const INT32 newOffset = (INT32)(hookedFunction - callInstructionBase);
+  const INT32 newOffset = (INT32)(hookedFunction - callBase);
   const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
   
-  SerialPrintHex("  Call instruction", callScan);
-  SerialPrintHex("  Original function", originalFunction);
-  SerialPrintHex("  Hooked function", hookedFunction);
-  SerialPrint("  Original offset: %d\n", originalOffset);
-  SerialPrint("  New offset: %d\n", newOffset);
-  SerialPrint("  Offset to original: %lld\n", offsetToOriginal);
+  SerialPrint("\n[*] Applying patch:\n");
+  SerialPrintHex("  CALL instruction", callAddr);
+  SerialPrintHex("  Original handler", originalFunction);
+  SerialPrintHex("  Hooked handler", hookedFunction);
+  SerialPrint("  Original offset: 0x%08x\n", originalOffset);
+  SerialPrint("  New offset: 0x%08x\n", newOffset);
+  SerialPrint("  Relative offset to original: %lld\n", offsetToOriginal);
   
-  //
-  // Patch the payload's global offset
-  //
+  // Patch payload globals
   INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
   *globalOffset = offsetToOriginal;
-  SerialPrint("[+] Patched G_original_offset_from_hook in payload\n");
-
-  //
-  // Patch the payload's arch offset
-  //
-  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)section);
-  *archOffset = 1; // ARCH_INTEL Payload/src/main.c
-  SerialPrint("[+] Patched G_arch to intel in payload\n");
   
-  //
-  // Patch the CALL instruction
-  //
+  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)section);
+  *archOffset = arch;
+  
+  SerialPrint("  [+] Updated payload globals\n");
+  
+  // Patch the CALL
   DisableMemoryProtection();
-  *(INT32*)(callScan + 1) = newOffset;
-  FlushInstructionCache((VOID*)callScan, 5);
+  *(INT32*)(callAddr + 1) = newOffset;
+  FlushInstructionCache((VOID*)callAddr, 5);
   EnableMemoryProtection();
   
-  SerialPrint("[+] Successfully patched Intel VM exit handler\n");
-  return EFI_SUCCESS;
+  SerialPrint("  [+] Patched CALL instruction\n");
 }
 
 //
-// AMD VM Exit Handler Patching
-// Multiple pattern strategies based on the article
+// AMD Strategy: Use the proven pattern
+// Pattern: E8 ? ? ? ? 48 89 04 24 E9
+// This is: CALL rel32; mov [rsp], rax; jmp rel32
 //
 static EFI_STATUS PatchVmExitHandler_Amd(IN UINT64 imageBase, IN UINT64 section) {
-  UINT64 scan = 0;
-  UINT64 callScan = 0;
+  UINT64 patternAddr;
   
-  SerialPrint("[*] Attempting AMD-specific VM exit handler patch...\n");
+  SerialPrint("\n[*] AMD Strategy: Searching for CALL+MOV+JMP pattern\n");
+  SerialPrint("    Pattern: E8 ? ? ? ? 48 89 04 24 E9\n");
   
-  //
-  // Strategy 1: Search for VMRUN (0F 01 D8) and look backwards for CALL
-  // According to the article, vmexit handler should be near VMRUN
-  //
-  SerialPrint("[*] Strategy 1: Searching for VMRUN instruction...\n");
-  scan = FindPatternImage((VOID*)imageBase, "0F 01 D8");
+  patternAddr = FindPatternImage((VOID*)imageBase, "E8 ? ? ? ? 48 89 04 24 E9");
   
-  if (scan) {
-    SerialPrint("[+] Found VMRUN at 0x%p\n", scan);
-    
-    // Look backwards for CALL instruction (typically within 256 bytes)
-    callScan = FindCallBeforeInstruction(scan, 256);
-    
-    if (callScan) {
-      SerialPrint("[+] Found CALL before VMRUN at 0x%p\n", callScan);
-      goto patch_call;
-    }
-    SerialPrint("[!] No CALL found before VMRUN, trying next strategy...\n");
+  if (!patternAddr) {
+    SerialPrint("[!] Pattern not found\n");
+    return EFI_UNSUPPORTED;
   }
   
-  //
-  // Strategy 2: Look for VMCB exit code access (offset 0x70)
-  // Pattern: mov reg, [reg+70h] or similar
-  //
-  SerialPrint("[*] Strategy 2: Searching for VMCB exit code access...\n");
+  SerialPrint("[+] Found pattern at 0x%p\n", patternAddr);
   
-  // Look for: mov r*, [r*+70h]
-  const CHAR8* vmcbPatterns[] = {
-    "48 8B ? 70",           // mov r64, [r*+70h]
-    "4C 8B ? 70",           // mov r64, [r*+70h] (r8-r15)
-    "48 8B 80 70 00 00 00", // mov rax, [rax+70h]
-    "4C 8B 80 70 00 00 00", // mov r8, [rax+70h]
-    NULL
-  };
-  
-  for (INT32 i = 0; vmcbPatterns[i] != NULL; i++) {
-    scan = FindPatternImage((VOID*)imageBase, vmcbPatterns[i]);
-    if (scan) {
-      SerialPrint("[+] Found VMCB exit code access at 0x%p\n", scan);
-      
-      // Look backwards for CALL
-      callScan = FindCallBeforeInstruction(scan, 512);
-      if (callScan) {
-        SerialPrint("[+] Found CALL before VMCB access at 0x%p\n", callScan);
-        goto patch_call;
-      }
-    }
+  // Verify it's actually a CALL instruction
+  if (*(UINT8*)patternAddr != 0xE8) {
+    SerialPrint("[!] ERROR: Expected E8 (CALL) at pattern location\n");
+    return EFI_UNSUPPORTED;
   }
   
-  //
-  // Strategy 3: VMLOAD -> VMRUN -> VMSAVE sequence
-  // Look for this sequence and find CALL in between
-  //
-  SerialPrint("[*] Strategy 3: Searching for VMLOAD/VMRUN/VMSAVE sequence...\n");
+  ApplyPatch(patternAddr, section, HV_ARCH_AMD);
   
-  // VMLOAD (0F 01 DA), then scan for CALL before VMRUN
-  UINT64 vmloadScan = FindPatternImage((VOID*)imageBase, "0F 01 DA");
-  if (vmloadScan) {
-    SerialPrint("[+] Found VMLOAD at 0x%p\n", vmloadScan);
-    
-    // Look for VMRUN after VMLOAD (within 512 bytes)
-    for (UINT64 offset = vmloadScan; offset < vmloadScan + 512; offset++) {
-      if (*(UINT8*)offset == 0x0F && *(UINT16*)(offset + 1) == 0xD801) {  // VMRUN
-        SerialPrint("[+] Found VMRUN at 0x%p after VMLOAD\n", offset);
-        
-        // Look for CALL between VMLOAD and VMRUN
-        for (UINT64 callOffset = vmloadScan; callOffset < offset; callOffset++) {
-          if (*(UINT8*)callOffset == 0xE8) {
-            callScan = callOffset;
-            SerialPrint("[+] Found CALL in VMLOAD/VMRUN sequence at 0x%p\n", callScan);
-            goto patch_call;
-          }
-        }
-        break;
-      }
-    }
-  }
-  
-  //
-  // Strategy 4: Original pattern (fallback)
-  //
-  SerialPrint("[*] Strategy 4: Using original pattern...\n");
-  scan = FindPatternImage((VOID*)imageBase, "E8 ? ? ? ? 48 89 04 24 E9");
-  
-  if (scan) {
-    SerialPrint("[+] Found original pattern at 0x%p\n", scan);
-    callScan = scan;
-    goto patch_call;
-  }
-  
-  SerialPrint("[!] All AMD strategies exhausted. Unable to locate VM exit handler.\n");
-  return EFI_UNSUPPORTED;
-
-patch_call:
-  //
-  // Calculate addresses for patching
-  //
-  const UINT64 callInstructionBase = callScan + 5;
-  const INT32 originalOffset = *(INT32*)(callScan + 1);
-  const UINT64 originalFunction = callInstructionBase + originalOffset;
-  const UINT64 hookedFunction = section + PAYLOAD_FUNCTION_OFFSET;
-  const INT32 newOffset = (INT32)(hookedFunction - callInstructionBase);
-  const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
-  
-  SerialPrintHex("  Call instruction", callScan);
-  SerialPrintHex("  Original function", originalFunction);
-  SerialPrintHex("  Hooked function", hookedFunction);
-  SerialPrint("  Original offset: %d\n", originalOffset);
-  SerialPrint("  New offset: %d\n", newOffset);
-  SerialPrint("  Offset to original: %lld\n", offsetToOriginal);
-  
-  //
-  // Patch the payload's global offset
-  //
-  INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
-  *globalOffset = offsetToOriginal;
-  SerialPrint("[+] Patched G_original_offset_from_hook in payload\n");
-
-  //
-  // Patch the payload's arch offset
-  //
-  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)section);
-  *archOffset = 2; // ARCH_AMD Payload/src/main.c
-  SerialPrint("[+] Patched G_arch to amd in payload\n");
-  
-  //
-  // Patch the CALL instruction
-  //
-  DisableMemoryProtection();
-  *(INT32*)(callScan + 1) = newOffset;
-  FlushInstructionCache((VOID*)callScan, 5);
-  EnableMemoryProtection();
-  
-  SerialPrint("[+] Successfully patched AMD VM exit handler\n");
+  SerialPrint("[+] AMD VM exit handler patched successfully\n");
   return EFI_SUCCESS;
 }
 
 //
-// Main patching function - handles both architectures
+// Intel Strategy: Find VMLAUNCH+VMRESUME pair (unique to main VM loop)
+// 
+// The main VM loop does this:
+//   if (first_time)
+//     vmlaunch
+//   else
+//     vmresume
+//
+// These instructions are very close together (within 10 bytes).
+// This pattern is UNIQUE to the main VM entry point.
+// 
+// Once we find this pair, we scan backwards to find the CALL to the exit handler.
+//
+static EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section) {
+  PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)imageBase;
+  PIMAGE_NT_HEADERS64 ntHeaders = (PIMAGE_NT_HEADERS64)(imageBase + dosHeader->e_lfanew);
+  PIMAGE_SECTION_HEADER sectionHdr = IMAGE_FIRST_SECTION(ntHeaders);
+  
+  UINT64 vmlaunchAddr = 0;
+  UINT64 vmresumeAddr = 0;
+  
+  SerialPrint("\n[*] Intel Strategy: Finding VMLAUNCH+VMRESUME pair (main VM loop)\n");
+  SerialPrint("    VMLAUNCH opcode: 0F 01 C2\n");
+  SerialPrint("    VMRESUME opcode: 0F 01 C3\n");
+  
+  // Scan executable sections looking for VMLAUNCH
+  for (UINT16 s = 0; s < ntHeaders->FileHeader.NumberOfSections; s++) {
+    if (!(sectionHdr[s].Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
+      continue;
+    }
+    
+    UINT64 sectionBase = imageBase + sectionHdr[s].VirtualAddress;
+    UINTN sectionSize = sectionHdr[s].Misc.VirtualSize;
+    
+    SerialPrint("[*] Scanning section: %.8a\n", sectionHdr[s].Name);
+    
+    // Find VMLAUNCH instructions
+    for (UINT64 addr = sectionBase; addr < sectionBase + sectionSize - 3; addr++) {
+      // Check for VMLAUNCH (0F 01 C2)
+      if (*(UINT8*)addr != 0x0F) continue;
+      if (*(UINT8*)(addr + 1) != 0x01) continue;
+      if (*(UINT8*)(addr + 2) != 0xC2) continue;
+      
+      vmlaunchAddr = addr;
+      SerialPrint("  [*] Found VMLAUNCH at 0x%p\n", vmlaunchAddr);
+      
+      // Look for VMRESUME within the next 20 bytes
+      // Pattern is typically: vmlaunch; jmp +X; vmresume
+      for (UINT64 scan = vmlaunchAddr + 3; scan < vmlaunchAddr + 20 && scan < sectionBase + sectionSize - 3; scan++) {
+        if (*(UINT8*)scan == 0x0F && *(UINT8*)(scan + 1) == 0x01 && *(UINT8*)(scan + 2) == 0xC3) {
+          vmresumeAddr = scan;
+          SerialPrint("  [+] Found VMRESUME at 0x%p (distance: %lld bytes)\n", 
+            vmresumeAddr, vmresumeAddr - vmlaunchAddr);
+          
+          // Found the pair! Now look backwards for CALL
+          goto found_pair;
+        }
+      }
+      
+      // Skip past this VMLAUNCH
+      addr += 2;
+    }
+  }
+  
+  SerialPrint("[!] Could not find VMLAUNCH+VMRESUME pair\n");
+  return EFI_UNSUPPORTED;
+
+found_pair:
+  SerialPrint("\n[+] Found main VM loop entry point\n");
+  SerialPrintHex("  VMLAUNCH", vmlaunchAddr);
+  SerialPrintHex("  VMRESUME", vmresumeAddr);
+  
+  //
+  // Now scan backwards from VMLAUNCH looking for CALL instructions
+  // The exit handler call is typically 200-600 bytes before VMRESUME
+  // We'll search up to 1000 bytes back to be safe
+  //
+  SerialPrint("\n[*] Scanning backwards for CALL to exit handler...\n");
+  SerialPrint("    Search range: up to 1000 bytes before VMLAUNCH\n");
+  
+  UINT64 searchStart = (vmlaunchAddr > 1000) ? (vmlaunchAddr - 1000) : imageBase;
+  UINT64 bestCall = 0;
+  INT32 bestDistance = 0;
+  INT32 candidateCount = 0;
+  
+  for (UINT64 scan = vmlaunchAddr - 1; scan >= searchStart; scan--) {
+    if (*(UINT8*)scan == 0xE8) {  // CALL rel32
+      INT32 distance = (INT32)(vmlaunchAddr - scan);
+      SerialPrint("  [*] Found CALL at 0x%p (distance: %d bytes)\n", scan, distance);
+      
+      candidateCount++;
+      
+      // We want a CALL that's reasonably far back
+      // Based on your disassembly, it should be 200-600 bytes
+      // Prefer calls in the 300-500 range (middle of expected range)
+      if (distance >= 200 && distance <= 700) {
+        SerialPrint("    [+] Distance is in valid range (200-700 bytes)\n");
+        
+        // Pick the one closest to 400 bytes (sweet spot)
+        INT32 idealDistance = 400;
+        INT32 currentScore = (distance > idealDistance) ? 
+          (distance - idealDistance) : (idealDistance - distance);
+        INT32 bestScore = (bestDistance > idealDistance) ? 
+          (bestDistance - idealDistance) : (idealDistance - bestDistance);
+        
+        if (bestCall == 0 || currentScore < bestScore) {
+          bestCall = scan;
+          bestDistance = distance;
+          SerialPrint("    [+] This is now the best candidate\n");
+        }
+      } else if (distance < 200) {
+        SerialPrint("    [-] Too close (< 200 bytes), likely not the handler\n");
+      } else {
+        SerialPrint("    [-] Too far (> 700 bytes), might be unrelated\n");
+      }
+    }
+  }
+  
+  SerialPrint("\n[*] Search complete. Found %d CALL instructions\n", candidateCount);
+  
+  if (!bestCall) {
+    SerialPrint("[!] No suitable CALL found\n");
+    SerialPrint("[!] All CALLs were outside the 200-700 byte range\n");
+    SerialPrint("[!] The VM exit handler might be inlined or structured differently\n");
+    return EFI_UNSUPPORTED;
+  }
+  
+  SerialPrint("\n[+] Selected best candidate:\n");
+  SerialPrintHex("  CALL instruction", bestCall);
+  SerialPrint("  Distance to VMLAUNCH: %d bytes\n", bestDistance);
+  
+  // Verify it's actually a CALL
+  if (*(UINT8*)bestCall != 0xE8) {
+    SerialPrint("[!] ERROR: Not a CALL instruction!\n");
+    return EFI_UNSUPPORTED;
+  }
+  
+  ApplyPatch(bestCall, section, HV_ARCH_INTEL);
+  
+  SerialPrint("[+] Intel VM exit handler patched successfully\n");
+  return EFI_SUCCESS;
+}
+
+//
+// Main entry point
 //
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
-  UINT64 section = 0;
-  int arch = HV_ARCH_UNKNOWN;
-  EFI_STATUS status = EFI_UNSUPPORTED;
+  UINT64 section;
+  int arch;
+  EFI_STATUS status;
   
   SerialPrint("\n");
   SerialPrint("================================================\n");
   SerialPrint("  VM Exit Handler Patching\n");
   SerialPrint("================================================\n");
+  SerialPrintHex("Image base", imageBase);
+  SerialPrintHex("Image size", imageSize);
   
-  //
-  // Detect the Hyper-V architecture
-  //
-  arch = DetectHyperVArchitecture((VOID*)imageBase, imageSize);
+  // Detect architecture
+  arch = DetectHyperVArchitecture((VOID*)imageBase);
   if (arch == HV_ARCH_UNKNOWN) {
-    SerialPrint("[!] Failed to detect Hyper-V architecture (Intel/AMD).\n");
+    SerialPrint("[!] Architecture detection failed\n");
     return EFI_UNSUPPORTED;
   }
   
-  //
-  // Add new section to store our payload
-  //
+  // Add payload section
   section = PeAddSection(imageBase, ".zczxyhc", PatchSizeVmExitHandler(), SECTION_RWX);
   if (!section) {
-    SerialPrint("[!] Failed to add section .zczxyhc for payload!\n");
+    SerialPrint("[!] Failed to add payload section\n");
     return EFI_UNSUPPORTED;
   }
   
-  //
-  // Copy payload to the new section
-  //
-  CopyMem((VOID*)section, g_payload_data, PAYLOAD_SIZE);
-  SerialPrint("[+] Copied payload (%u bytes) to section at 0x%p\n", PAYLOAD_SIZE, section);
+  SerialPrintHex("Payload section", section);
+  SerialPrint("[+] Payload size: %u bytes\n", PAYLOAD_SIZE);
   
-  //
-  // Apply architecture-specific patching with multiple strategies
-  //
+  // Copy payload
+  CopyMem((VOID*)section, g_payload_data, PAYLOAD_SIZE);
+  SerialPrint("[+] Payload copied to section\n");
+  
+  // Apply architecture-specific patch
   if (arch == HV_ARCH_INTEL) {
     status = PatchVmExitHandler_Intel(imageBase, section);
-  } else if (arch == HV_ARCH_AMD) {
+  } else {
     status = PatchVmExitHandler_Amd(imageBase, section);
   }
   
-  if (status != EFI_SUCCESS) {
-    SerialPrint("[!] Failed to apply patches.\n");
-    SerialPrint("================================================\n\n");
-    return status;
-  }
-
-  if (arch == HV_ARCH_INTEL) {
-    SerialPrint("\n[+] VM Exit Handler successfully hooked Intel\n");
+  if (EFI_ERROR(status)) {
+    SerialPrint("[!] Patching failed\n");
   } else {
-    SerialPrint("\n[+] VM Exit Handler successfully hooked AMD\n");
+    SerialPrint("\n[+] Patching completed successfully\n");
+    SerialPrint("[*] Payload will execute on next VM exit\n");
   }
   
-  return EFI_SUCCESS;
+  SerialPrint("================================================\n\n");
+  
+  return status;
 }
