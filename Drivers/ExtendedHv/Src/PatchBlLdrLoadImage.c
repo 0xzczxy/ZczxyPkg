@@ -101,7 +101,11 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   //
   // Patch Vm Exit Handler
   //
-  InstallPatch_VmExitHandler(entry->ModuleBase, entry->SizeOfImage);
+  if (EFI_ERROR(InstallPatch_VmExitHandler(entry->ModuleBase, entry->SizeOfImage))) {
+    SerialPrint("[!] Failed to patch VmExitHandler!\n");
+  } else {
+    SerialPrint("[+] Patched VmExitHandler.\n");
+  }
 
   return status;
 }

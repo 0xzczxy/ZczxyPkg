@@ -1,51 +1,17 @@
 #include "ExtendedHv.h"
 #include "Compiler.h"
+#include "WinDefines.h"
 
-typedef struct {
-  UINT64 Low;
-  UINT64 High;
-} UINT128;
-
-typedef struct STRUCTURE_ALLIGN(16) GUEST_CONTEXT {
-  UINT8 Reserved1[8];
-  UINT64 Rcx;
-  UINT64 Rdx;
-  UINT64 Rbx;
-  UINT8 Reserved2[8];
-  UINT64 Rbp;
-  UINT64 Rsi;
-  UINT64 Rdi;
-  UINT64 R8;
-  UINT64 R9;
-  UINT64 R10;
-  UINT64 R11;
-  UINT64 R12;
-  UINT64 R13;
-  UINT64 R14;
-  UINT64 R15;
-  UINT128 Xmm0;
-  UINT128 Xmm1;
-  UINT128 Xmm2;
-  UINT128 Xmm3;
-  UINT128 Xmm4;
-  UINT128 Xmm5;
-  UINT128 Xmm6;
-  UINT128 Xmm7;
-  UINT128 Xmm8;
-  UINT128 Xmm9;
-  UINT128 Xmm10;
-  UINT128 Xmm11;
-  UINT128 Xmm12;
-  UINT128 Xmm13;
-  UINT128 Xmm14;
-  UINT128 Xmm15;
-  UINT8 Reserved3[8];
-  UINT64 VmcbPhysicalAddress;
-} GUEST_CONTEXT, * PGUEST_CONTEXT;
+//
+// Payload is separately compiled, the raw bytes are then included here
+// 
+#include "../Payload/payload_data.h"
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
+extern UINT64 PeAddSection(IN UINT64 imageBase, IN CONST CHAR8* sectionName, IN UINT32 virtualSize, IN UINT32 characteristics);
+extern UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern);
 
 // Public Globals
 // None
@@ -55,68 +21,88 @@ EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize);
 UINT64 PatchSizeVmExitHandler(VOID);
 
 // Private Globals
-static BOOLEAN gVmExitCalled = FALSE;
+// None
 
 // Private Functions
-static UINT64 PatchedVmExitHandler(VOID* arg1, VOID* arg2, PGUEST_CONTEXT context);
-static VOID PatchedVmExitHandlerEnd(); // This function has to be allocated and this symbol is to know the size
+// None
 
 // Implementation
 
 UINT64 PatchSizeVmExitHandler(VOID) {
-  return ((void*)&PatchedVmExitHandlerEnd) - ((void*)&PatchedVmExitHandler);
+  return PAYLOAD_SIZE;
 }
 
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
+  UINT64 section = 0;
+  UINT64 scan = 0;
+  
   //
   // Add new section to store our patched function
   // 
-
-
-  //
-  // Pattern scan for the vmrun instruction as a byte sequence
-  // 
-
-  
-  //
-  // Install the patch
-  // 
-
-
-  return EFI_SUCCESS;
-}
-
-static UINT64 PatchedVmExitHandler(VOID* arg1, VOID* arg2, PGUEST_CONTEXT context) {
-  if (!gVmExitCalled) {
-    gVmExitCalled = TRUE;
-
-    //
-    // Debug Print
-    // 
-    SerialPrint("Reached into the VmExitHandler.\n");
-
-    //
-    // Initialize Memory
-    // 
-    
-
+  section = PeAddSection(imageBase, ".zczxyhc", PatchSizeVmExitHandler(), SECTION_RWX);
+  if (!section) {
+    SerialPrint("[!] Failed to add section .zczxyhc for our custom payload!\n");
+    return EFI_UNSUPPORTED;
   }
 
   //
-  // Check if VmExit was called by cpuid
+  // Pattern scan for the call instruction (E8 = call with rel32 offset)
   // 
+  scan = FindPatternImage((VOID*)imageBase, "E8 ? ? ? ? 48 89 04 24 E9");
+  if (!scan) {
+    SerialPrint("[!] Failed to find pattern for the call instruction.\n");
+    return EFI_UNSUPPORTED;
+  }
   
-
+  SerialPrint("[+] Found call instruction at 0x%p\n", scan);
+  
   //
-  // Check if VtlReturn was called (VTL1 to VTL0 Translation)
-  // 
-
-
+  // Copy payload to the new section
   //
-  // Return original
-  // 
-
-  return 0;
+  CopyMem((VOID*)section, g_payload_data, PAYLOAD_SIZE);
+  SerialPrint("[+] Copied payload (%u bytes) to section at 0x%p\n", PAYLOAD_SIZE, section);
+  
+  //
+  // Calculate addresses for patching the call instruction
+  // E8 xx xx xx xx = call rel32 (1 byte opcode + 4 byte offset)
+  //
+  const UINT64 callInstructionBase = scan + 5;  // Address after the call instruction
+  const INT32 originalOffset = *(INT32*)(scan + 1);  // Read current rel32 offset
+  const UINT64 originalFunction = callInstructionBase + originalOffset;
+  const UINT64 hookedFunction = section + PAYLOAD_FUNCTION_OFFSET;  // Our hook at offset 0x10
+  const INT32 newOffset = (INT32)(hookedFunction - callInstructionBase);
+  
+  //
+  // Calculate offset from hooked function back to original
+  // The payload needs this to call the original handler
+  //
+  const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
+  
+  SerialPrintHex("  Call instruction", scan);
+  SerialPrintHex("  Original function", originalFunction);
+  SerialPrintHex("  Hooked function", hookedFunction);
+  SerialPrint("  Original offset: %d\n", originalOffset);
+  SerialPrint("  New offset: %d\n", newOffset);
+  SerialPrint("  Offset to original: %lld\n", offsetToOriginal);
+  
+  //
+  // Patch the G_original_offset_from_hook global in the payload
+  // This is at offset 0x00 in the payload
+  //
+  INT64* globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
+  *globalOffset = offsetToOriginal;
+  SerialPrint("[+] Patched G_original_offset_from_hook in payload\n");
+  
+  //
+  // Patch the call instruction to jump to our hooked function
+  //
+  DisableMemoryProtection();
+  *(INT32*)(scan + 1) = newOffset;
+  FlushInstructionCache((VOID*)scan, 5);
+  EnableMemoryProtection();
+  
+  SerialPrint("[+] Patched call instruction to redirect to hook\n");
+  SerialPrint("[+] VM Exit Handler hook installed successfully\n");
+  
+  return EFI_SUCCESS;
 }
-static VOID PatchedVmExitHandlerEnd() { volatile int dont_optimize_please = 0; (void)dont_optimize_please; } // This function has to be allocated and this symbol is to know the size
-

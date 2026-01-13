@@ -2,21 +2,7 @@
 
 ## Overview
 
-This DXE_RUNTIME_DRIVER provides functionality for direct user control at ring -1 permission level. 
-
-The driver exists in two main stages, driver loading and driver execution.
-
-In stage 1, loading from the shell - [Check Quickstart Here](#quickstart) - the driver hooks the `OpenProtocol` and registers for the `VirtualMemoryAddresssChange` event.
-
-Afterwards, in stage 2, the drier gets called via the `OpenProtocol` hook, then, proceeding to capture the return address - via inline assembly or built in for reading [rsp] on call - where the caller is known to potentially be winload.efi
-
-With the return address, we now have knowledge of where winload.efi is loaded by working from the address backwards until we find a valid image, saving the result to `gWinloadBase` and closing the hook with an added guard of not searching again even if called.
-
-Finally, now we know the winload.efi base we proceed to patch `BlLdrLoadImage` which will, at some point, load `hvic.sys` allowing us knowledge of our final destination point.
-
-Once `hvis.sys` has been found, we simply patch it, like winload.efi, exposing our own functionality through a vmexit handler. The vmexit handler can be called by multiple instructions but the one we will focus on is `CPUID`.
-
-The end result, a user program can call to `CPUID` with a special value in a register which our own code patched into HVIC will handle within the ring -1 space and allow, for example, execution of arbitrary ring -1 code, reading of programs memory from ring -1 space, writing to programs memory from ring -1 space, etc... 
+This DXE_RUNTIME_DRIVER provides functionality for direct user control at VTL 1 permission level, the new highest permission level in Windows 11.
 
 **WARNING: This is inrecibly dangerous and could cause, system instability, potential copywright violations (depending on juridstication), or could fall to exploitation by malicous actors.**
 **WARNING: DO NOT UNDER ANY CIRCUMSTANCES INSTALL THIS WITHOUT KNOWING WHAT IT DOES AND PROPERLY UNDERSTANDING THE RISK.**
@@ -54,7 +40,7 @@ build -a X64 -t GCC5 -p ShellPkg/ShellPkg.dsc
 build -a X64 -t GCC5 -p ZczxyPkg/ZczxyPkg.dsc
 ```
 
-**Copy either Shell_*.efi application and the ExtendedHv.efi driver into your USB stick**
+**Copy Shell_E....efi application and the ExtendedHv.efi driver into your USB stick**
 ```
 TODO
 ```
@@ -75,3 +61,42 @@ exit
 # Note UEFI will automatically go to the next boot option which should be windows boot manager
 # or (in the case of grub) allow a screen to select the windows boot manager.
 ```
+
+## Implementation Details
+
+**Control Flow**
+```markdown
+Main:
+- InstallHook_ExitBootServices
+- InstallHook_GetVariable
+
+GetVariableHook:
+- InstallPatch_BlImgAllocateImageBuffer
+- InstallPatch_BlLdrLoadImage
+
+BlImgAllocateImageBuffer:
+- Extend allocation for hypervisor by our payload size.
+
+BlLdrLoadImage:
+- AddSection
+- InstallPayload
+- PatchCallInstruction
+```
+
+Once the payload is installed it will sit on the vmexit functionality, intercepting calls for CPUID with a specific leaf value to create a hypercall interface.
+
+The installation of the payload is very simplistic, I am sure you have probably seen this before in multiple different programs, the most interesting part is how the payload is managed.
+
+Our payload must be a completely isolated section inside the hypervisor, such a section has also got to have a single function and potentially multiple globals.
+
+We have multiple options on how to integrate our payload:
+- **MSVC __ImageBase**: Copy the entire driver into the section and then scan for our own exit handler function, simplistic but bulky and MSVC specific.
+- **Program Data**: Compile a program sperately, turn the bytes into a C array and embed it into our program directly, copy the bytes into the section and have the function at a fixed or findable offset (i.e. by some magic value we know will be there).
+- **Assembly Module**: Include an assembly module placed in a specific section or at least all together in the same section (which should be possible via assembly level control), then copy from from two symbols the program data into our section and complete similar steps to program data.
+
+We have been forced to utilize **Program Data** as the best option, an assembly module is unrealistic with how complex the VmExitHandler code will be, and we can't rely on __ImageBase since I personally compile and test on a linux system (nixos).
+
+Its a bit hacky, but it does work, you compile the payload separately, generate the header file by a python script, and compile the driver with the payloads byte embedded into the .data section. The function will have to exist at a specific offset which is why we need to utilize linker scripts.
+
+
+

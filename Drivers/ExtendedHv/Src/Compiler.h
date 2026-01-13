@@ -1,49 +1,52 @@
 #ifndef __COMPILER_INTRINSICS_H
 #define __COMPILER_INTRINSICS_H
 
-#if defined(_MSC_VER)
-  /* MSVC Intrinsics */
-  #include <intrin.h>
+//
+// We do not currently support the MSVC Toolchain,
+// check README.md for more information.
+// 
 
-  #define STRUCTURE_ALLIGN(size) __declspec(align((size)))
+// #if defined(_MSC_VER)
+//   #include <intrin.h>
 
-  static inline UINT64 GetReturnAddress(VOID)
-  {
-    return (UINT64)_ReturnAddress();
-  }
+//   #define STRUCTURE_ALLIGN(size) __declspec(align((size)))
 
-  static inline VOID EnableMemoryProtection(VOID)
-  {
-    UINT64 cr0 = __readcr0();
-    cr0 |= (1ULL << 16); /* Set WP (Write Protect) bit */
-    __writecr0(cr0);
-  }
+//   static inline UINT64 GetReturnAddress(VOID)
+//   {
+//     return (UINT64)_ReturnAddress();
+//   }
 
-  static inline VOID DisableMemoryProtection(VOID)
-  {
-    UINT64 cr0 = __readcr0();
-    cr0 &= ~(1ULL << 16); /* Clear WP (Write Protect) bit */
-    __writecr0(cr0);
-  }
+//   static inline VOID EnableMemoryProtection(VOID)
+//   {
+//     UINT64 cr0 = __readcr0();
+//     cr0 |= (1ULL << 16); /* Set WP (Write Protect) bit */
+//     __writecr0(cr0);
+//   }
 
-  static inline VOID FlushInstructionCache(VOID *address, UINTN size)
-  {
-    int cpuInfo[4];
-    UINTN offset;
+//   static inline VOID DisableMemoryProtection(VOID)
+//   {
+//     UINT64 cr0 = __readcr0();
+//     cr0 &= ~(1ULL << 16); /* Clear WP (Write Protect) bit */
+//     __writecr0(cr0);
+//   }
+
+//   static inline VOID FlushInstructionCache(VOID *address, UINTN size)
+//   {
+//     int cpuInfo[4];
+//     UINTN offset;
     
-    // Flush cache lines (64-byte aligned)
-    for (offset = 0; offset < size; offset += 64) {
-      _mm_clflush((void*)((UINT64)address + offset));
-    }
+//     // Flush cache lines (64-byte aligned)
+//     for (offset = 0; offset < size; offset += 64) {
+//       _mm_clflush((void*)((UINT64)address + offset));
+//     }
     
-    // Memory fence and serialization
-    _mm_mfence();
-    __cpuid(cpuInfo, 0);
-  }
+//     // Memory fence and serialization
+//     _mm_mfence();
+//     __cpuid(cpuInfo, 0);
+//   }
 
-#elif defined(__GNUC__)
-  /* GCC Inline Assembly */
-
+// #elif defined(__GNUC__)
+#if defined(__GNUC__)
   #define STRUCTURE_ALLIGN(size) __attribute__((aligned((size))))
 
   static inline UINT64 GetReturnAddress(VOID)
