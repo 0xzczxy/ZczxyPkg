@@ -39,11 +39,6 @@ UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern) {
   PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(ntHeaders);
   
   for (UINT16 i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++) {
-    // Only scan executable sections
-    if (!(section[i].Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
-      continue;
-    }
-    
     UINT64 sectionBase = (UINT64)imageBase + section[i].VirtualAddress;
     UINTN sectionSize = section[i].Misc.VirtualSize;
     
