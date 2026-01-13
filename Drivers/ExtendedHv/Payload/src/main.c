@@ -30,6 +30,32 @@ static int g_vmexit_called = 0;
 
 uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, void *context) {
   //
+  // REBOOT
+  // 
+  __asm__ __volatile__ (
+    "outb %0, %1"
+    :
+    : "a"((unsigned char)0xFE), "Nd"((unsigned char)0x64)
+    : "memory"
+  );
+  __asm__ __volatile__ (
+    "outb %0, %1"
+    :
+    : "a"((unsigned char)0x06), "Nd"((unsigned short)0xCF9)
+    : "memory"
+  );
+  
+  //
+  // CRASH SYSTEM
+  // 
+  *(volatile uint64_t*)0 = 0;
+
+  //
+  // Fall back, Infinite Loop
+  // 
+  while (true);
+
+  //
   // First time initialization
   // 
   if (!g_vmexit_called) {
