@@ -6,15 +6,17 @@
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern EFI_STATUS InstallPatch(volatile patchinfo_t *info, void *originalFunction, void *targetFunction);
+extern UINT64 PatchSizeVmExitHandler(VOID);
 
 // Public Globals
 BOOLEAN gExtendedAllocation = FALSE;
+patchinfo_t gBlImgAllocateImageBufferPatchInfo;
 
 // Public Functions
 EFI_STATUS InstallPatch_BlImgAllocateImageBuffer(IN VOID *originalFunction);
 
 // Private Globals
-static volatile patchinfo_t gBlImgAllocateImageBufferPatchInfo;
+// None
 
 // Private Functions
 // None
@@ -65,8 +67,8 @@ static UINT64 EFIAPI PatchedBlImgAllocateImageBuffer(
   // The hypervisor has a specific attribute value
   //
   if (attributes == ATTRIBUTE_HV_IMAGE && !gExtendedAllocation) {
-    UINTN payloadSize = 100; // TODO: Get payload size...
-    
+    UINTN payloadSize = PatchSizeVmExitHandler();
+
     //
     // Extend allocation to include our payload
     //

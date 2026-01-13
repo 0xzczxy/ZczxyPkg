@@ -6,17 +6,17 @@
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 extern EFI_STATUS InstallPatch(volatile patchinfo_t *info, void *originalFunction, void *targetFunction);
-extern UINT64 PeAddSection(IN UINT64 imageBase, IN CONST CHAR8* sectionName, IN UINT32 virtualSize, IN UINT32 characteristics);
-extern UINT64 FindPatternImage(IN VOID* imageBase, IN CONST CHAR8* pattern);
+extern EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize);
 
 // Public Globals
 BOOLEAN gHvFound = FALSE;
+patchinfo_t gBlLdrLoadImagePatchInfo;
 
 // Public Functions
 EFI_STATUS InstallPatch_BlLdrLoadImage(IN VOID *originalFunction);
 
 // Private Globals
-static volatile patchinfo_t gBlLdrLoadImagePatchInfo;
+// None
 
 // Private Functions
 static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
@@ -24,7 +24,6 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   VOID* arg8, VOID* arg9, VOID* arg10, VOID* arg11, VOID* arg12, VOID* arg13,
   VOID* arg14,  VOID* arg15, VOID* arg16, VOID* arg17
 );
-static EFI_STATUS ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize);
 
 // Implementation
 
@@ -100,22 +99,10 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   gHvFound = TRUE;
 
   //
-  // Process hv.exe
+  // TODO: Patch Vm Exit Handler
   //
-  if (EFI_ERROR(ProcessHvImage(entry->ModuleBase, entry->SizeOfImage))) {
-    // TODO: Report error
-  }
+  // InstallPatch_VmExitHandler(imagebase, imagesize)
 
   return status;
 }
 
-static EFI_STATUS ProcessHvImage(IN UINT64 imageBase, IN UINT64 imageSize) {
-  (void)imageBase;
-  (void)imageSize;
-  
-  //
-  // TODO: Add a new section to add our payload into the hypervisor
-  // 
-
-  return EFI_SUCCESS;
-}

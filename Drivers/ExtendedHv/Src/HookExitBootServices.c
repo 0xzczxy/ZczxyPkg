@@ -1,14 +1,15 @@
 #include "ExtendedHv.h"
 
 // Imports
-extern BOOLEAN gBlLdrLoadImageReached;
+extern patchinfo_t gBlLdrLoadImagePatchInfo;
+extern patchinfo_t gBlImgAllocateImageBufferPatchInfo;
 extern BOOLEAN gExtendedAllocation;
+extern BOOLEAN gHvFound;
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
 
 // Public Globals
-extern BOOLEAN gExtendedAllocation;
-extern BOOLEAN gHvFound;
+// None
 
 // Public Functions
 EFI_STATUS InstallHook_ExitBootServices(VOID);
@@ -73,6 +74,12 @@ static EFI_STATUS EFIAPI HookedExitBootServices(IN EFI_HANDLE imageHandle, IN UI
   } else {
     SerialPrint("gExtendedAllocation FALSE, patch not working.\n");
   }
+
+  //
+  // Uninstall patches to clean winload.efi (not required)
+  // 
+  UninstallPatch(&gBlImgAllocateImageBufferPatchInfo);
+  UninstallPatch(&gBlLdrLoadImagePatchInfo);
 
   //
   // Pass through to original
