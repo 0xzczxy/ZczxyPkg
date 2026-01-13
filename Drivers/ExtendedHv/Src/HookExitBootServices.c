@@ -7,6 +7,7 @@ extern BOOLEAN gExtendedAllocation;
 extern BOOLEAN gHvFound;
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
 extern VOID EFIAPI SerialPrintHex(IN CONST CHAR8 *label, IN UINT64 value);
+extern EFI_STATUS UninstallPatch(IN OUT patchinfo_t *info);
 
 // Public Globals
 // None

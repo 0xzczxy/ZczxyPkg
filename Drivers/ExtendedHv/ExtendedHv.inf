@@ -16,6 +16,7 @@
   Src/HookGetVariable.c
   Src/PatchBlLdrLoadImage.c
   Src/PatchBlImgAllocateImageBuffer.c
+  Src/PatchVmExitHandler.c
 
 [Packages]
   MdePkg/MdePkg.dec

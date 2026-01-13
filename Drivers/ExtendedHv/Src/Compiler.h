@@ -5,6 +5,8 @@
   /* MSVC Intrinsics */
   #include <intrin.h>
 
+  #define STRUCTURE_ALLIGN(size) __declspec(align((size)))
+
   static inline UINT64 GetReturnAddress(VOID)
   {
     return (UINT64)_ReturnAddress();
@@ -41,6 +43,8 @@
 
 #elif defined(__GNUC__)
   /* GCC Inline Assembly */
+
+  #define STRUCTURE_ALLIGN(size) __attribute__((aligned((size))))
 
   static inline UINT64 GetReturnAddress(VOID)
   {

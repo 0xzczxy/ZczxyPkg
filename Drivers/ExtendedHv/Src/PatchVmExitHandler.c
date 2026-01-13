@@ -1,11 +1,12 @@
 #include "ExtendedHv.h"
+#include "Compiler.h"
 
 typedef struct {
   UINT64 Low;
   UINT64 High;
 } UINT128;
 
-typedef struct __declspec(align(16)) GUEST_CONTEXT {
+typedef struct STRUCTURE_ALLIGN(16) GUEST_CONTEXT {
   UINT8 Reserved1[8];
   UINT64 Rcx;
   UINT64 Rdx;
@@ -63,7 +64,7 @@ static VOID PatchedVmExitHandlerEnd(); // This function has to be allocated and 
 // Implementation
 
 UINT64 PatchSizeVmExitHandler(VOID) {
-  return PatchedVmExitHandler - PatchedVmExitHandlerEnd;
+  return ((void*)&PatchedVmExitHandlerEnd) - ((void*)&PatchedVmExitHandler);
 }
 
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
@@ -115,7 +116,7 @@ static UINT64 PatchedVmExitHandler(VOID* arg1, VOID* arg2, PGUEST_CONTEXT contex
   // Return original
   // 
 
-
+  return 0;
 }
-static VOID PatchedVmExitHandlerEnd() { volatile int dont_optimize_please; (void)dont_optimize_please; } // This function has to be allocated and this symbol is to know the size
+static VOID PatchedVmExitHandlerEnd() { volatile int dont_optimize_please = 0; (void)dont_optimize_please; } // This function has to be allocated and this symbol is to know the size
 

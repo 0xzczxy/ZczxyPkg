@@ -99,9 +99,9 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
   gHvFound = TRUE;
 
   //
-  // TODO: Patch Vm Exit Handler
+  // Patch Vm Exit Handler
   //
-  // InstallPatch_VmExitHandler(imagebase, imagesize)
+  InstallPatch_VmExitHandler(entry->ModuleBase, entry->SizeOfImage);
 
   return status;
 }
