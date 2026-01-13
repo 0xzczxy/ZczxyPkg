@@ -68,6 +68,7 @@ def generate_header(binary_data: bytes, binary_filename: str) -> str:
  * 
  * Layout:
  *   Offset 0x00-0x07: G_original_offset_from_hook (int64_t)
+ *   Offset 0x08-0x0A: G_arch (int32_t)
  *   Offset 0x10+:     hooked_vmexit_handler function
  * 
  * The driver will:
@@ -84,18 +85,26 @@ static const uint8_t g_payload_data[] = {{
 /* Payload metadata */
 #define PAYLOAD_SIZE                    {size}
 #define PAYLOAD_GLOBAL_OFFSET           0x00
+#define PAYLOAD_ARCH_OFFSET             0x08
 #define PAYLOAD_FUNCTION_OFFSET         0x10
 #define PAYLOAD_GLOBAL_SIZE             8
+#define PAYLOAD_ARCH_SIZE               4
 
 /* Helper macro to get pointer to function within payload */
 #define PAYLOAD_FUNCTION_PTR(base) \\
     ((uint64_t (__attribute__((ms_abi)) *)(void*, void*, void*)) \\
      ((uintptr_t)(base) + PAYLOAD_FUNCTION_OFFSET))
 
-/* Helper macro to get pointer to global offset field */
+ /* Helper macro to get pointer to global offset field */
 // WARNING: INT64 and int64_t may be different, in definition (i.e. long long int vs long int) but, they should both be 64 bits making this safe.
 #define PAYLOAD_GLOBAL_PTR(base) \\
     ((INT64 *)((uintptr_t)(base) + PAYLOAD_GLOBAL_OFFSET))
+
+/* Helper macro to get pointer to global offset field */
+#define PAYLOAD_ARCH_PTR(base) \\
+    ((INT32 *)((uintptr_t)(base) + PAYLOAD_ARCH_OFFSET))
+
+
 
 #endif /* {guard_name} */
 """
@@ -138,6 +147,7 @@ def main():
     print(f"✓ Generated '{output_file}'")
     print(f"  - Size: {len(binary_data)} bytes")
     print(f"  - Global offset field: 0x00 (8 bytes)")
+    print(f"  - Arch offset field: 0x08 (4 bytes)")
     print(f"  - Function starts at: 0x10")
     
     return 0

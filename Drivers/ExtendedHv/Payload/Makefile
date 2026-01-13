@@ -44,7 +44,7 @@ $(TARGET_BIN): $(TARGET_ELF)
 	@echo "✓ Generated $(TARGET_BIN)"
 	@ls -lh $(TARGET_BIN)
 	@echo "✓ Offsets:"
-	@nm $(TARGET_ELF) | grep -E "G_original_offset_from_hook|hooked_vmexit_handler" || echo "  (Check with: nm $(TARGET_ELF))"
+	@nm $(TARGET_ELF) | grep -E "G_original_offset_from_hook|G_arch|hooked_vmexit_handler" || echo "  (Check with: nm $(TARGET_ELF))"
 
 clean:
 	rm -f $(OBJECTS) $(TARGET_ELF) $(TARGET_BIN)

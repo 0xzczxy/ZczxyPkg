@@ -8,11 +8,9 @@
 
 #include "../Payload/payload_data.h"
 
-typedef enum {
-  HV_ARCH_UNKNOWN,
-  HV_ARCH_INTEL,
-  HV_ARCH_AMD
-} HV_ARCHITECTURE;
+#define HV_ARCH_UNKNOWN 0
+#define HV_ARCH_INTEL 1
+#define HV_ARCH_AMD 2
 
 // Imports
 extern VOID EFIAPI SerialPrint(IN CONST CHAR8 *format, ...);
@@ -31,7 +29,7 @@ UINT64 PatchSizeVmExitHandler(VOID);
 // None
 
 // Private Functions
-static HV_ARCHITECTURE DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize);
+static int DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize);
 static EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section);
 static EFI_STATUS PatchVmExitHandler_Amd(IN UINT64 imageBase, IN UINT64 section);
 static UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 searchRadius);
@@ -42,7 +40,7 @@ UINT64 PatchSizeVmExitHandler(VOID) {
   return PAYLOAD_SIZE;
 }
 
-STATIC HV_ARCHITECTURE DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize) {
+static int DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 imageSize) {
   // AMD detection: Look for VMRUN instruction (0F 01 D8)
   if (FindPatternImage(imageBase, "0F 01 D8") != 0) {
     SerialPrint("[*] Detected AMD Hyper-V (hvax64.exe) - VMRUN instruction found\n");
@@ -62,7 +60,7 @@ STATIC HV_ARCHITECTURE DetectHyperVArchitecture(IN VOID* imageBase, IN UINT64 im
 // Helper function to find CALL instruction before a given address
 // Searches backwards from instructionAddr for E8 (CALL rel32)
 //
-STATIC UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 searchRadius) {
+static UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 searchRadius) {
   UINT64 searchStart = (instructionAddr > searchRadius) ? (instructionAddr - searchRadius) : 0;
   UINT64 lastCall = 0;
   
@@ -79,7 +77,7 @@ STATIC UINT64 FindCallBeforeInstruction(IN UINT64 instructionAddr, IN UINT64 sea
 // Intel VM Exit Handler Patching
 // Multiple pattern strategies based on the article
 //
-STATIC EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section) {
+static EFI_STATUS PatchVmExitHandler_Intel(IN UINT64 imageBase, IN UINT64 section) {
   UINT64 scan = 0;
   UINT64 callScan = 0;
   
@@ -180,9 +178,16 @@ patch_call:
   //
   // Patch the payload's global offset
   //
-  INT64* globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
+  INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
   *globalOffset = offsetToOriginal;
   SerialPrint("[+] Patched G_original_offset_from_hook in payload\n");
+
+  //
+  // Patch the payload's arch offset
+  //
+  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)section);
+  *archOffset = 1; // ARCH_INTEL Payload/src/main.c
+  SerialPrint("[+] Patched G_arch to intel in payload\n");
   
   //
   // Patch the CALL instruction
@@ -200,7 +205,7 @@ patch_call:
 // AMD VM Exit Handler Patching
 // Multiple pattern strategies based on the article
 //
-STATIC EFI_STATUS PatchVmExitHandler_Amd(IN UINT64 imageBase, IN UINT64 section) {
+static EFI_STATUS PatchVmExitHandler_Amd(IN UINT64 imageBase, IN UINT64 section) {
   UINT64 scan = 0;
   UINT64 callScan = 0;
   
@@ -320,9 +325,16 @@ patch_call:
   //
   // Patch the payload's global offset
   //
-  INT64* globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
+  INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)section);
   *globalOffset = offsetToOriginal;
   SerialPrint("[+] Patched G_original_offset_from_hook in payload\n");
+
+  //
+  // Patch the payload's arch offset
+  //
+  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)section);
+  *archOffset = 2; // ARCH_AMD Payload/src/main.c
+  SerialPrint("[+] Patched G_arch to amd in payload\n");
   
   //
   // Patch the CALL instruction
@@ -341,7 +353,7 @@ patch_call:
 //
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
   UINT64 section = 0;
-  HV_ARCHITECTURE arch = HV_ARCH_UNKNOWN;
+  int arch = HV_ARCH_UNKNOWN;
   EFI_STATUS status = EFI_UNSUPPORTED;
   
   SerialPrint("\n");

@@ -1,6 +1,10 @@
 #include "payload.h"
 
-typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(void *arg1, void *arg2, PGUEST_CONTEXT context);
+typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(void *arg1, void *arg2, void *context);
+
+#define ARCH_UNKNOWN 0
+#define ARCH_INTEL 1
+#define ARCH_AMD 2
 
 // Imports
 extern void serial_write(const char *);
@@ -8,10 +12,12 @@ extern void serial_write(const char *);
 // Public Globals
 __attribute__((section(".data.global")))
 int64_t G_original_offset_from_hook = 0xAABBCCDDEEFF0011; // its value is set through a patch on the bytes and we have to ensure it comes first
+__attribute__((section(".data.global")))
+int32_t G_arch = 0x0; // its value is set through a patch on the bytes and we have to ensure it comes first
 
 // Public Functions
 __attribute__((section(".text.function")))
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, PGUEST_CONTEXT context); // this function is called through file offset and must come straight after the global
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, void *context); // this function is called through file offset and must come straight after the global
 
 // Private Globals
 static int g_vmexit_called = 0;
@@ -22,7 +28,7 @@ static int g_vmexit_called = 0;
 
 // Implementation
 
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, PGUEST_CONTEXT context) {
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, void *context) {
   //
   // First time initialization
   // 
