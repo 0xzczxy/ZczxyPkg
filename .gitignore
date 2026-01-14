@@ -1,4 +1,5 @@
 *.elf
 *.bin
 *.o
-payload_data.h
+payload_intel_data.h
+payload_amd_data.h
