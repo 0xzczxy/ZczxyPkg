@@ -53,7 +53,7 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, v
   //
   // Fall back, Infinite Loop
   // 
-  while (true);
+  while (1);
 
   //
   // First time initialization

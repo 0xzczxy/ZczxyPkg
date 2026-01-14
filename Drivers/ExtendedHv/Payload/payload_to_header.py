@@ -78,7 +78,7 @@ def generate_header(binary_data: bytes, binary_filename: str) -> str:
  */
 
 /* Payload binary data */
-static const uint8_t g_payload_data[] = {{
+static uint8_t g_payload_data[] = {{
 {hex_array}
 }};
 
