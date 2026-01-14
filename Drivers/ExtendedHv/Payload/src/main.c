@@ -34,16 +34,6 @@ static int g_vmexit_called = 0;
 
 uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, void *context) {
   //
-  // HALT
-  // 
-  __asm__ __volatile__ ( "int3" );
-  
-  //
-  // Fall back, Infinite Loop
-  // 
-  while (1);
-
-  //
   // First time initialization
   // 
   if (!g_vmexit_called) {
