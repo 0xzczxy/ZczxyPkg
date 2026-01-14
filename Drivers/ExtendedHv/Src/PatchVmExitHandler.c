@@ -108,7 +108,8 @@ static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section) {
   SerialPrint("[+] Copying updated payload.\n");
 
   //
-  // Copy the correct payload into memory
+  // Copy the patched payload into the section
+  // Note: g_intel_payload_data has already been patched by PatchCall
   // 
   DisableMemoryProtection();
   CopyMem((VOID*)section, g_intel_payload_data, INTEL_PAYLOAD_SIZE);
@@ -130,7 +131,8 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
   SerialPrint("[+] Copying updated payload.\n");
 
   //
-  // Copy the correct payload into memory
+  // Copy the patched payload into the section
+  // Note: g_amd_payload_data has already been patched by PatchCall
   // 
   DisableMemoryProtection();
   CopyMem((VOID*)section, g_amd_payload_data, AMD_PAYLOAD_SIZE);
@@ -176,12 +178,12 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
   SerialPrint("[+] New offset: 0x%x\n", newOffset);
 
   //
-  // Patch payload globals
+  // Patch the payload data array (in our program's data section, already writable)
   //
   *payloadGlobal = offsetToOriginal;
 
   //
-  // Write the patch to memory
+  // Patch the hypervisor's call instruction (requires memory protection disabled)
   //
   DisableMemoryProtection();
   *(INT32*)(callAddr + 1) = newOffset;
@@ -192,4 +194,3 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
 
   return EFI_SUCCESS;
 }
-
