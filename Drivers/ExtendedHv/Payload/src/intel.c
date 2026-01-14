@@ -6,6 +6,7 @@ typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(context_t 
 
 // Import
 extern void serial_write(const char *string);
+extern void serial_write_pointer(const char *msg, void *addr);
 
 // Public Globals
 __attribute__((section(".data.global")))
@@ -30,6 +31,7 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint3
   if (!g_vmexit_called) {
     g_vmexit_called = 1;
     serial_write("[+] Intel VM-Exit handler active\n");
+    serial_write_pointer("[+] G_original_offset_from_hook", (void*)G_original_offset_from_hook);
   }
 
   //

@@ -13,6 +13,7 @@
 
 // Public Functions
 void serial_write(const char *string);
+void serial_write_pointer(const char *msg, void *addr);
 
 // Private Globals
 // None
@@ -23,6 +24,37 @@ static inline void IoWrite8(uint16_t port, uint8_t value);
 static inline uint8_t IoRead8(uint16_t port);
 
 // Implementation
+
+void serial_write_pointer(const char *msg, void *addr) {
+  static const char hex_chars[] = "0123456789ABCDEF";
+  char buffer[64];
+  uint64_t value = (uint64_t)addr;
+  int pos = 0;
+  int i;
+  
+  // Copy message
+  while (msg[pos] && pos < 40) {
+    buffer[pos] = msg[pos];
+    pos++;
+  }
+  
+  // Add ": 0x"
+  buffer[pos++] = ':';
+  buffer[pos++] = ' ';
+  buffer[pos++] = '0';
+  buffer[pos++] = 'x';
+  
+  // Convert pointer to hex (16 digits)
+  for (i = 60; i >= 0; i -= 4) {
+    buffer[pos++] = hex_chars[(value >> i) & 0xF];
+  }
+  
+  buffer[pos++] = '\n';
+  buffer[pos] = '\0';
+  
+  serial_write(buffer);
+}
+
 
 void serial_write(const char *string) {
   if (!string) {
