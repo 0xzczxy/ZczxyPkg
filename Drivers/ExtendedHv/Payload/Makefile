@@ -3,7 +3,7 @@ LD := ld
 OBJCOPY := objcopy
 
 # Compiler flags
-CFLAGS := --save-temps -fPIC \
+CFLAGS := --save-temps -fPIC -fno-plt -fvisibility=hidden \
           -fno-asynchronous-unwind-tables \
           -fno-exceptions \
           -fno-stack-protector \
