@@ -1,12 +1,12 @@
 //
 // COMMON DEFINITIONS FOR HVIX64.EXE
-// 
+//
 
 #include <stdint.h>
 
 typedef struct {
-  u64 _upper;
-  u64 _lower;  
+  uint64_t _upper;
+  uint64_t _lower;
 } uint128_t;
 
 //
@@ -16,7 +16,7 @@ typedef struct {
 // however, I do not think the first registers will change, only new additions should be
 // added, hopefully, windows 11 does not break backwards compatibility for their own
 // and our sake.
-//  
+//
 struct context {
 	uint64_t rax;
 	uint64_t rcx;

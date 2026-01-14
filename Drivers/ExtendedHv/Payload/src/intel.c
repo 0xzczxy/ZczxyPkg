@@ -23,10 +23,10 @@ static int g_vmexit_called = 0;
 
 // Implementation
 
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *context, uint32_t exit_reason, uint32_t exit_reason_full) {
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full) {
   //
   // Attempt to debug serial print on the first run through (serial printing could fail at such a mature state in the os)
-  // 
+  //
   if (!g_vmexit_called) {
     g_vmexit_called = 1;
     serial_write("[+] Intel VM-Exit handler active\n");
@@ -35,7 +35,7 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *context, uint32_t e
 
   //
   // Call original handler
-  // 
+  //
   original_vmexit_handler_t original = (original_vmexit_handler_t)(
       (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
   );
