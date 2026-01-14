@@ -36,7 +36,10 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint3
     serial_write_pointer("[+] offset", (void*)&G_original_offset_from_hook);
 
     serial_write_pointer("[+] offset", (void*)G_original_offset_from_hook);
+
+    serial_write_pointer("[+] arg0", (void*)context);
   }
+
 
   //
   // Call original handler
