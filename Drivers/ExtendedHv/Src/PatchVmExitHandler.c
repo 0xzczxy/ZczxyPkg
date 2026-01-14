@@ -160,6 +160,7 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
   const UINT64 hookedFunction = section + payloadFunctionOffset;
   const INT32 newOffset = (INT32)(hookedFunction - callBase);
   const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
+  (void)newOffset;
 
   //
   // Patch payload globals
@@ -169,10 +170,10 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
   //
   // Write the patch to memory
   // 
-  DisableMemoryProtection();
-  *(INT32*)(callAddr + 1) = newOffset;
-  FlushInstructionCache((VOID*)callAddr, 5);
-  EnableMemoryProtection();
+  // DisableMemoryProtection();
+  // *(INT32*)(callAddr + 1) = newOffset;
+  // FlushInstructionCache((VOID*)callAddr, 5);
+  // EnableMemoryProtection();
 
   SerialPrint("[+] Patched CALL instruction successfully.\n");
 
