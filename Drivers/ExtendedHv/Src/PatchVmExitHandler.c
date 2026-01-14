@@ -23,8 +23,7 @@ UINT64 PatchSizeVmExitHandler(VOID);
 static int DetectArchitecture(IN VOID* imageBase);
 static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section);
 static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section);
-static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN INT64 *payload_global, UINT64 payloadFunctionOffset);
-
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN UINT32 callOffset, IN INT64 *payloadGlobal, UINT64 payloadFunctionOffset);
 
 // Implementation
 UINT64 PatchSizeVmExitHandler(VOID) {
@@ -102,7 +101,7 @@ static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section) {
   // even with the documentation, no one knows what was going through
   // the developers mind when designing this system.)
   //
-  if (EFI_ERROR(PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?", INTEL_PAYLOAD_GLOBAL_PTR(g_intel_payload_data), INTEL_PAYLOAD_FUNCTION_OFFSET))) {
+  if (EFI_ERROR(PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?", 7, INTEL_PAYLOAD_GLOBAL_PTR(g_intel_payload_data), INTEL_PAYLOAD_FUNCTION_OFFSET))) {
     SerialPrint("[!] Failed to patch Call for Intel, not copying!\n");
     return EFI_UNSUPPORTED;
   }
@@ -124,7 +123,7 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
   // Find pattern for the relative call that has not changed since the release of voyager
   // https://github.com/backengineering/Voyager/blob/master/Voyager/Voyager/Hv.h
   //
-  if (EFI_ERROR(PatchCall(imageBase, section, "E8 ? ? ? ? 48 89 04 24 E9", AMD_PAYLOAD_GLOBAL_PTR(g_amd_payload_data), AMD_PAYLOAD_FUNCTION_OFFSET))) {
+  if (EFI_ERROR(PatchCall(imageBase, section, "E8 ? ? ? ? 48 89 04 24 E9", 0, AMD_PAYLOAD_GLOBAL_PTR(g_amd_payload_data), AMD_PAYLOAD_FUNCTION_OFFSET))) {
     SerialPrint("[!] Failed to patch Call for AMD, not copying!\n");
     return EFI_UNSUPPORTED;
   }
@@ -141,26 +140,40 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
   return EFI_SUCCESS;
 }
 
-static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN INT64 *payloadGlobal, UINT64 payloadFunctionOffset) {
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN UINT32 callOffset, IN INT64 *payloadGlobal, UINT64 payloadFunctionOffset) {
+  UINT64 patternAddr;
   UINT64 callAddr;
+  UINT64 callBase;
+  INT32 originalOffset;
+  UINT64 originalFunction;
+  UINT64 hookedFunction;
+  INT32 newOffset;
+  INT64 offsetToOriginal;
 
-  callAddr = FindPatternImage((VOID*)imageBase, pattern);
-  if (!callAddr) {
+  patternAddr = FindPatternImage((VOID*)imageBase, pattern);
+  if (!patternAddr) {
     SerialPrint("[!] Pattern not found.\n");
     return EFI_UNSUPPORTED;
   }
-  SerialPrint("[+] Found pattern at 0x%p\n", callAddr);
+  SerialPrint("[+] Found pattern at 0x%p\n", patternAddr);
+
+  // Adjust to point to the E8 byte
+  callAddr = patternAddr + callOffset;
+  SerialPrint("[+] CALL instruction at 0x%p\n", callAddr);
 
   //
   // Get the information for patching the call instruction
   // 
-  const UINT64 callBase = callAddr + 5;
-  const INT32 originalOffset = *(INT32*)(callAddr + 1);
-  const UINT64 originalFunction = callBase + originalOffset;
-  const UINT64 hookedFunction = section + payloadFunctionOffset;
-  const INT32 newOffset = (INT32)(hookedFunction - callBase);
-  const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
-  (void)newOffset;
+  callBase = callAddr + 5;
+  originalOffset = *(INT32*)(callAddr + 1);
+  originalFunction = callBase + originalOffset;
+  hookedFunction = section + payloadFunctionOffset;
+  newOffset = (INT32)(hookedFunction - callBase);
+  offsetToOriginal = (INT64)(originalFunction - hookedFunction);
+
+  SerialPrint("[+] Original offset: 0x%x\n", originalOffset);
+  SerialPrint("[+] Original function: 0x%p\n", originalFunction);
+  SerialPrint("[+] New offset: 0x%x\n", newOffset);
 
   //
   // Patch payload globals
@@ -169,11 +182,11 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
 
   //
   // Write the patch to memory
-  // 
-  // DisableMemoryProtection();
-  // *(INT32*)(callAddr + 1) = newOffset;
-  // FlushInstructionCache((VOID*)callAddr, 5);
-  // EnableMemoryProtection();
+  //
+  DisableMemoryProtection();
+  *(INT32*)(callAddr + 1) = newOffset;
+  FlushInstructionCache((VOID*)callAddr, 5);
+  EnableMemoryProtection();
 
   SerialPrint("[+] Patched CALL instruction successfully.\n");
 
