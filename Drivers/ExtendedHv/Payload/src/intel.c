@@ -13,7 +13,7 @@ int64_t G_original_offset_from_hook = 0x0; // its value is set through a patch o
 
 // Public Functions
 __attribute__((section(".text.function")))
-uint64_t __attribute__((ms_abi,naked)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full);
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full);
 
 // Private Globals
 static int g_vmexit_called = 0;
@@ -23,7 +23,7 @@ static int g_vmexit_called = 0;
 
 // Implementation
 
-uint64_t __attribute__((ms_abi,naked)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full) {
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full) {
   //
   // Attempt to debug serial print on the first run through (serial printing could fail at such a mature state in the os)
   //
@@ -32,7 +32,6 @@ uint64_t __attribute__((ms_abi,naked)) hooked_vmexit_handler(context_t *context,
     serial_write("[+] Intel VM-Exit handler active\n");
   }
 
-
   //
   // Call original handler
   //
@@ -40,18 +39,7 @@ uint64_t __attribute__((ms_abi,naked)) hooked_vmexit_handler(context_t *context,
       (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
   );
 
-  //
-  // The original handler may want a clean stack frame, this forces the compiler to clean up
-  // (although a tail call should already be used on a simple return like this)
-  // 
-  __asm__ volatile(
-    "jmp *%0"
-    : 
-    : "r" (original)
-    :
-  );
-
-  __builtin_unreachable();
+  return original(context, exit_reason, exit_reason_full);
 }
 
 
