@@ -27,10 +27,10 @@ uint64_t __attribute__((ms_abi,naked)) hooked_vmexit_handler(context_t *context,
   //
   // Attempt to debug serial print on the first run through (serial printing could fail at such a mature state in the os)
   //
-  // if (!g_vmexit_called) {
-  //   g_vmexit_called = 1;
-  //   serial_write("[+] Intel VM-Exit handler active\n");
-  // }
+  if (!g_vmexit_called) {
+    g_vmexit_called = 1;
+    serial_write("[+] Intel VM-Exit handler active\n");
+  }
 
 
   //
