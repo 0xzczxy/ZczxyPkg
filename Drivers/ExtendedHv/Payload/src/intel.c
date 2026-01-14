@@ -30,8 +30,8 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint3
   //
   if (!g_vmexit_called) {
     g_vmexit_called = 1;
-    serial_write("[+] Intel VM-Exit handler active\n");
-    serial_write_pointer("[+] G_original_offset_from_hook", (void*)G_original_offset_from_hook);
+    // serial_write("[+] Intel VM-Exit handler active\n");
+    serial_write_pointer("[+] offset", (void*)G_original_offset_from_hook);
   }
 
   //
