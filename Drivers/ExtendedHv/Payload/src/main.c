@@ -10,10 +10,14 @@ typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(void *arg1
 extern void serial_write(const char *);
 
 // Public Globals
-__attribute__((section(".data.global")))
-int64_t G_original_offset_from_hook = 0xAABBCCDDEEFF0011; // its value is set through a patch on the bytes and we have to ensure it comes first
+
+//
+// For some reason this is done in reverse order, g_arch must come first to be placed after G_original_offset_from_hook
+// 
 __attribute__((section(".data.global")))
 int32_t G_arch = 0x0; // its value is set through a patch on the bytes and we have to ensure it comes first
+__attribute__((section(".data.global")))
+int64_t G_original_offset_from_hook = 0xAABBCCDDEEFF0011; // its value is set through a patch on the bytes and we have to ensure it comes first
 
 // Public Functions
 __attribute__((section(".text.function")))
@@ -30,26 +34,10 @@ static int g_vmexit_called = 0;
 
 uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, void *arg2, void *context) {
   //
-  // REBOOT
+  // HALT
   // 
-  __asm__ __volatile__ (
-    "outb %0, %1"
-    :
-    : "a"((unsigned char)0xFE), "Nd"((unsigned char)0x64)
-    : "memory"
-  );
-  __asm__ __volatile__ (
-    "outb %0, %1"
-    :
-    : "a"((unsigned char)0x06), "Nd"((unsigned short)0xCF9)
-    : "memory"
-  );
+  __asm__ __volatile__ ( "int3" );
   
-  //
-  // CRASH SYSTEM
-  // 
-  *(volatile uint64_t*)0 = 0;
-
   //
   // Fall back, Infinite Loop
   // 

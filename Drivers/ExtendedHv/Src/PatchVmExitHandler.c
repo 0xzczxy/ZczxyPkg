@@ -22,6 +22,7 @@ UINT64 PatchSizeVmExitHandler(VOID);
 static int DetectArchitecture(IN VOID* imageBase);
 static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section);
 static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section);
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern);
 
 
 // Implementation
@@ -101,84 +102,31 @@ static int DetectArchitecture(IN VOID* imageBase) {
 }
 
 static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section) {
-  UINT64 vmwriteAddr;
-  UINT64 leaAddr;
-  
   //
-  // Find VMWRITE instruction that sets HOST_RIP (0x6c16)
-  // Pattern: mov eax, 0x6c16 ; vmwrite rax, rcx
+  // This seems to change every window version, intel will most likely
+  // require a more robust solution. I have disssassembled this myself and
+  // will write up the method in the blog I make about this afterwards.
+  // (The blog is to ensure I won't forget this when I need to come back
+  // and do it again, intel really is a company of all time. I would like
+  // to make it clear Intel is not difficult due to good security, its because
+  // even with the documentation, no one knows what was going through
+  // the developers mind when designing this system.)
   //
-  vmwriteAddr = FindPatternImage((VOID*)imageBase, "B8 16 6C 00 00 0F 79 C1");
-  if (!vmwriteAddr) {
-    SerialPrint("[!] HOST_RIP VMWRITE not found.\n");
-    return EFI_UNSUPPORTED;
-  }
-  SerialPrint("[+] Found VMWRITE at 0x%llx\n", vmwriteAddr);
-  
-  //
-  // Back up to find the LEA instruction that loads the handler address
-  // Pattern: lea rcx, [rip+offset]  (48 8D 0D)
-  //
-  leaAddr = vmwriteAddr;
-  for (int i = 0; i < 32; i++) {  // Search backwards max 32 bytes
-    leaAddr--;
-    if (*(UINT8*)leaAddr == 0x48 && 
-        *(UINT8*)(leaAddr + 1) == 0x8D && 
-        *(UINT8*)(leaAddr + 2) == 0x0D) {
-      break;
-    }
-  }
-  
-  if (leaAddr == vmwriteAddr - 32) {
-    SerialPrint("[!] LEA instruction not found.\n");
-    return EFI_UNSUPPORTED;
-  }
-  SerialPrint("[+] Found LEA at 0x%llx\n", leaAddr);
-  
-  //
-  // Calculate addresses (same logic as AMD)
-  //
-  const UINT64 leaBase = leaAddr + 7;  // LEA is 7 bytes: 48 8D 0D XX XX XX XX
-  const INT32 originalOffset = *(INT32*)(leaAddr + 3);
-  const UINT64 originalHandler = leaBase + originalOffset;
-  const UINT64 hookedHandler = section + PAYLOAD_FUNCTION_OFFSET;
-  const INT32 newOffset = (INT32)(hookedHandler - leaBase);
-  const INT64 offsetToOriginal = (INT64)(originalHandler - hookedHandler);
-  
-  SerialPrint("[+] Original handler: 0x%llx\n", originalHandler);
-  SerialPrint("[+] Hooked handler: 0x%llx\n", hookedHandler);
-  SerialPrint("[+] Offset to original: 0x%llx\n", offsetToOriginal);
-  
-  //
-  // Patch payload globals
-  //
-  INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)g_payload_data);
-  *globalOffset = offsetToOriginal;
-  
-  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)g_payload_data);
-  *archOffset = ARCH_INTEL;
-  
-  //
-  // Patch the LEA instruction's offset
-  //
-  DisableMemoryProtection();
-  *(INT32*)(leaAddr + 3) = newOffset;
-  FlushInstructionCache((VOID*)leaAddr, 7);
-  EnableMemoryProtection();
-  
-  SerialPrint("[+] INTEL Patched LEA instruction successfully.\n");
-  
-  return EFI_SUCCESS;
+  return PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?");
 }
 
 static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
-  UINT64 callAddr;
-
   //
   // Find pattern for the relative call that has not changed since the release of voyager
   // https://github.com/backengineering/Voyager/blob/master/Voyager/Voyager/Hv.h
   //
-  callAddr = FindPatternImage((VOID*)imageBase, "E8 ? ? ? ? 48 89 04 24 E9");
+  return PatchCall(imageBase, section, "E8 ? ? ? ? 48 89 04 24 E9");
+}
+
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern) {
+  UINT64 callAddr;
+
+  callAddr = FindPatternImage((VOID*)imageBase, pattern);
   if (!callAddr) {
     SerialPrint("[!] Pattern not found.\n");
     return EFI_UNSUPPORTED;
@@ -187,7 +135,6 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
 
   //
   // Get the information for patching the call instruction
-  // (this is very obtuse)
   // 
   const UINT64 callBase = callAddr + 5;
   const INT32 originalOffset = *(INT32*)(callAddr + 1);
@@ -206,16 +153,15 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
   *archOffset = ARCH_AMD;
 
   //
-  // Patch the call within hvax64.exe
+  // Write the patch to memory
   // 
   DisableMemoryProtection();
   *(INT32*)(callAddr + 1) = newOffset;
   FlushInstructionCache((VOID*)callAddr, 5);
   EnableMemoryProtection();
 
-  SerialPrint("[+] AMD Patched CALL instruction successfully.\n");
+  SerialPrint("[+] Patched CALL instruction successfully.\n");
 
   return EFI_SUCCESS;
 }
-
 
