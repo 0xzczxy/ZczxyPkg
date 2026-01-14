@@ -63,6 +63,15 @@ static UINT64 EFIAPI PatchedBlImgAllocateImageBuffer(
   VOID* unknown2
 ) {
   //
+  // NOTE: Apparently you have to patch the second allocation, I have only seen
+  //       voyager do this and so far i can see no difference when I remove
+  //       the gExtendedAllocation. It could be worth trying to catch the second
+  //       HV_IMAGE allocation to extend instead.
+  //
+  // reference: https://github.com/backengineering/Voyager/blob/master/Voyager/Voyager/WinLoad.c
+  // 
+
+  //
   // Check if this is the hypervisor image allocation
   // The hypervisor has a specific attribute value
   //

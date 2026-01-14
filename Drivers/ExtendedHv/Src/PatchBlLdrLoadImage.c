@@ -107,6 +107,13 @@ static EFI_STATUS EFIAPI PatchedBlLdrLoadImage(
     SerialPrint("[+] Patched VmExitHandler.\n");
   }
 
+  //
+  // Reference: https://github.com/backengineering/Voyager/blob/master/Voyager/Voyager/WinLoad.c
+ 	// extend the size of the image in hyper-v's nt headers and LDR data entry...
+	// this is required, if this is not done, then hyper-v will simply not be loaded...
+	// 
+  entry->SizeOfImage = NT_HEADERS(entry->ModuleBase)->OptionalHeader.SizeOfImage;
+
   return status;
 }
 
