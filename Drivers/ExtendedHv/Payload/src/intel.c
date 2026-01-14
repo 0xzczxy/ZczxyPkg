@@ -1,8 +1,8 @@
 #include "intel.h"
-
 #include <stdint.h>
+#include <stddef.h>
 
-typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full);
+typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(void *context_raw, uint32_t exit_reason, uint32_t exit_reason_full);
 
 // Import
 extern void serial_write(const char *string);
@@ -13,131 +13,83 @@ extern void serial_write_hex_dump(const char *msg, void *addr, uint32_t length);
 
 // Public Globals
 __attribute__((section(".data.global")))
-int64_t G_original_offset_from_hook = 0x0; // its value is set through a patch on the bytes and we have to ensure it comes first
+int64_t G_original_offset_from_hook = 0x0;
 
 // Public Functions
 __attribute__((section(".text.function")))
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full);
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *context_raw, uint32_t exit_reason, uint32_t exit_reason_full);
 
 // Private Globals
-static int g_vmexit_called = 0;
+static int g_vmexit_count = 0;
+static const char g_hex_chars[] = "0123456789ABCDEF";
 
 // Private Functions
-static void dump_context_structure(context_t *context);
-
+static void analyze_context_for_cpuid(void *context_raw, uint32_t exit_reason);
 
 // Implementation
 
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(context_t *context, uint32_t exit_reason, uint32_t exit_reason_full) {
+uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *context_raw, uint32_t exit_reason, uint32_t exit_reason_full) {
+  g_vmexit_count++;
+
   //
-  // Attempt to debug serial print on the first run through
+  // Special analysis for first CPUID exit
   //
-  if (!g_vmexit_called) {
-    g_vmexit_called = 1;
-    
-    serial_write("\n========================================\n");
-    serial_write("[+] Intel VM-Exit Handler Active\n");
-    serial_write("========================================\n");
-
-    //
-    // Print function addresses and offsets
-    // 
-    serial_write("\n[*] Function Information:\n");
-    serial_write_pointer("  hooked_vmexit_handler addr", (void*)hooked_vmexit_handler);
-    serial_write_pointer("  G_original_offset addr", (void*)&G_original_offset_from_hook);
-    serial_write_hex64("  G_original_offset value", (uint64_t)G_original_offset_from_hook);
-
-    //
-    // Print arguments
-    // 
-    serial_write("\n[*] Function Arguments:\n");
-    serial_write_pointer("  arg0 (context ptr)", (void*)context);
-    serial_write_hex32("  arg1 (exit_reason)", exit_reason);
-    serial_write_hex32("  arg2 (exit_reason_full)", exit_reason_full);
-
-    //
-    // Decode exit reason
-    // 
-    serial_write("\n[*] Exit Reason Analysis:\n");
-    serial_write("Common exit reasons:\n");
-    serial_write("  0x00 = Exception/NMI\n");
-    serial_write("  0x01 = External interrupt\n");
-    serial_write("  0x0A = CPUID\n");
-    serial_write("  0x0C = HLT\n");
-    serial_write("  0x0E = INVLPG\n");
-    serial_write("  0x10 = RDTSC\n");
-    serial_write("  0x12 = VMCALL\n");
-    serial_write("  0x1C = CR access\n");
-    serial_write("  0x1E = I/O instruction\n");
-    serial_write("  0x30 = WRMSR\n");
-
-    //
-    // Dump context structure
-    // 
-    serial_write("\n[*] Context Structure Dump:\n");
-    dump_context_structure(context);
-
-    //
-    // Dump raw memory around context
-    // 
-    serial_write("\n[*] Raw Context Memory (first 512 bytes):\n");
-    serial_write_hex_dump(NULL, context, 512);
-
-    serial_write("\n========================================\n");
-    serial_write("[+] Continuing to original handler...\n");
-    serial_write("========================================\n\n");
+  if (g_vmexit_count <= 5 && exit_reason == 0x0A) {
+    analyze_context_for_cpuid(context_raw, exit_reason);
   }
 
   //
   // Call original handler
   //
   original_vmexit_handler_t original = (original_vmexit_handler_t)(
-    (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
+      (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
   );
 
-  return original(context, exit_reason, exit_reason_full);
+  return original(context_raw, exit_reason, exit_reason_full);
 }
 
-static void dump_context_structure(context_t *context) {
-  serial_write(" General Purpose Registers:\n");
-  serial_write_hex64("  RAX", context->rax);
-  serial_write_hex64("  RCX", context->rcx);
-  serial_write_hex64("  RDX", context->rdx);
-  serial_write_hex64("  RBX", context->rbx);
-  serial_write_hex64("  RSP", context->rsp);
-  serial_write_hex64("  RBP", context->rbp);
-  serial_write_hex64("  RSI", context->rsi);
-  serial_write_hex64("  RDI", context->rdi);
-  serial_write_hex64("  R8 ", context->r8);
-  serial_write_hex64("  R9 ", context->r9);
-  serial_write_hex64("  R10", context->r10);
-  serial_write_hex64("  R11", context->r11);
-  serial_write_hex64("  R12", context->r12);
-  serial_write_hex64("  R13", context->r13);
-  serial_write_hex64("  R14", context->r14);
-  serial_write_hex64("  R15", context->r15);
-
-  serial_write("\n XMM Registers (showing upper/lower 64-bits):\n");
-  serial_write_hex64("  XMM0 upper", context->xmm0._upper);
-  serial_write_hex64("  XMM0 lower", context->xmm0._lower);
-  serial_write_hex64("  XMM1 upper", context->xmm1._upper);
-  serial_write_hex64("  XMM1 lower", context->xmm1._lower);
-  serial_write_hex64("  XMM2 upper", context->xmm2._upper);
-  serial_write_hex64("  XMM2 lower", context->xmm2._lower);
-
-  // Sanity checks
-  serial_write("\n Sanity Checks:\n");
-  if (context->rsp > 0xFFFF800000000000ULL) {
-    serial_write("  [OK] RSP is in kernel address space\n");
-  } else {
-    serial_write("  [!!] RSP is NOT in expected kernel range\n");
-  }
-
-  // Check if context pointer itself is in kernel space
-  uint64_t ctx_addr = (uint64_t)context;
-  if (ctx_addr > 0xFFFF800000000000ULL) {
-    serial_write("  [OK] Context pointer is in kernel space\n");
-  } else {
-    serial_write("  [!!] Context pointer is NOT in kernel space\n");
-  }
+static void analyze_context_for_cpuid(void *context_raw, uint32_t exit_reason) {
+    uint64_t *qwords = (uint64_t *)context_raw;
+    
+    serial_write("\n========================================\n");
+    serial_write("[+] CPUID Exit - Structure Analysis\n");
+    serial_write("========================================\n");
+    
+    serial_write_hex32("\n[*] Exit reason", exit_reason);
+    serial_write_pointer("[*] Context pointer", context_raw);
+    
+    serial_write("\n[*] Searching for CPUID leaf in first 256 bytes...\n");
+    serial_write("    (CPUID leaf should be 0-0x20 for basic leaves)\n\n");
+    
+    // Dump first 32 qwords (256 bytes) and look for small values that could be CPUID leaves
+    for (int i = 0; i < 32; i++) {
+        uint64_t value = qwords[i];
+        char offset_msg[32];
+        
+        // Format offset message
+        offset_msg[0] = ' ';
+        offset_msg[1] = ' ';
+        offset_msg[2] = '+';
+        offset_msg[3] = '0';
+        offset_msg[4] = 'x';
+        // Convert offset to hex (3 digits should be enough)
+        int offset = i * 8;
+        offset_msg[5] = g_hex_chars[(offset >> 8) & 0xF];
+        offset_msg[6] = g_hex_chars[(offset >> 4) & 0xF];
+        offset_msg[7] = g_hex_chars[offset & 0xF];
+        offset_msg[8] = '\0';
+        
+        serial_write_hex64(offset_msg, value);
+        
+        // Check if this could be a CPUID leaf
+        if (value < 0x100 && value != 0) {
+            serial_write("      ^^^ POSSIBLE CPUID LEAF! ^^^\n");
+        }
+    }
+    
+    serial_write("\n[*] Full hex dump of first 512 bytes:\n");
+    serial_write_hex_dump(NULL, context_raw, 512);
+    
+    serial_write("\n========================================\n\n");
 }
+
