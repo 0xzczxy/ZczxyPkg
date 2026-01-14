@@ -1,7 +1,8 @@
 #include "ExtendedHv.h"
 #include "Compiler.h"
 #include "WinDefines.h"
-#include "../Payload/payload_data.h"
+#include "../Payload/payload_intel_data.h"
+#include "../Payload/payload_amd_data.h"
 
 #define ARCH_UNKNOWN 0
 #define ARCH_INTEL 1
@@ -22,12 +23,12 @@ UINT64 PatchSizeVmExitHandler(VOID);
 static int DetectArchitecture(IN VOID* imageBase);
 static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section);
 static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section);
-static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern);
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN INT64 *payload_global, UINT64 payloadFunctionOffset);
 
 
 // Implementation
 UINT64 PatchSizeVmExitHandler(VOID) {
-  return PAYLOAD_SIZE;
+  return INTEL_PAYLOAD_SIZE < AMD_PAYLOAD_SIZE ? AMD_PAYLOAD_SIZE : INTEL_PAYLOAD_SIZE;
 }
 
 EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
@@ -69,17 +70,6 @@ EFI_STATUS InstallPatch_VmExitHandler(UINT64 imageBase, UINT64 imageSize) {
   }
   SerialPrint("[+] Patch hv*x64.exe successfully.\n");
 
-
-  //
-  // Copy payload (g_payload_data is patched from PatchIntel/PatchAmd)
-  // 
-  DisableMemoryProtection();
-  CopyMem((VOID*)section, g_payload_data, PAYLOAD_SIZE);
-  FlushInstructionCache((VOID*)section, PAYLOAD_SIZE);
-  EnableMemoryProtection();
-
-  SerialPrint("[+] Patching succeeded.\n");
-
   return EFI_SUCCESS;
 }
 
@@ -112,7 +102,21 @@ static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section) {
   // even with the documentation, no one knows what was going through
   // the developers mind when designing this system.)
   //
-  return PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?");
+  if (EFI_ERROR(PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?", INTEL_PAYLOAD_GLOBAL_PTR(g_intel_payload_data), INTEL_PAYLOAD_FUNCTION_OFFSET))) {
+    SerialPrint("[!] Failed to patch Call for Intel, not copying!\n");
+    return EFI_UNSUPPORTED;
+  }
+  SerialPrint("[+] Copying updated payload.\n");
+
+  //
+  // Copy the correct payload into memory
+  // 
+  DisableMemoryProtection();
+  CopyMem((VOID*)section, g_intel_payload_data, INTEL_PAYLOAD_SIZE);
+  FlushInstructionCache((VOID*)section, INTEL_PAYLOAD_SIZE);
+  EnableMemoryProtection();
+
+  return EFI_SUCCESS;  
 }
 
 static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
@@ -120,10 +124,24 @@ static EFI_STATUS PatchAmd(IN UINT64 imageBase, IN UINT64 section) {
   // Find pattern for the relative call that has not changed since the release of voyager
   // https://github.com/backengineering/Voyager/blob/master/Voyager/Voyager/Hv.h
   //
-  return PatchCall(imageBase, section, "E8 ? ? ? ? 48 89 04 24 E9");
+  if (EFI_ERROR(PatchCall(imageBase, section, "E8 ? ? ? ? 48 89 04 24 E9", AMD_PAYLOAD_GLOBAL_PTR(g_amd_payload_data), AMD_PAYLOAD_FUNCTION_OFFSET))) {
+    SerialPrint("[!] Failed to patch Call for AMD, not copying!\n");
+    return EFI_UNSUPPORTED;
+  }
+  SerialPrint("[+] Copying updated payload.\n");
+
+  //
+  // Copy the correct payload into memory
+  // 
+  DisableMemoryProtection();
+  CopyMem((VOID*)section, g_amd_payload_data, AMD_PAYLOAD_SIZE);
+  FlushInstructionCache((VOID*)section, AMD_PAYLOAD_SIZE);
+  EnableMemoryProtection();
+
+  return EFI_SUCCESS;
 }
 
-static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern) {
+static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHAR8 *pattern, IN INT64 *payloadGlobal, UINT64 payloadFunctionOffset) {
   UINT64 callAddr;
 
   callAddr = FindPatternImage((VOID*)imageBase, pattern);
@@ -139,18 +157,14 @@ static EFI_STATUS PatchCall(IN UINT64 imageBase, IN UINT64 section, IN CONST CHA
   const UINT64 callBase = callAddr + 5;
   const INT32 originalOffset = *(INT32*)(callAddr + 1);
   const UINT64 originalFunction = callBase + originalOffset;
-  const UINT64 hookedFunction = section + PAYLOAD_FUNCTION_OFFSET;
+  const UINT64 hookedFunction = section + payloadFunctionOffset;
   const INT32 newOffset = (INT32)(hookedFunction - callBase);
   const INT64 offsetToOriginal = (INT64)(originalFunction - hookedFunction);
 
   //
   // Patch payload globals
   //
-  INT64 *globalOffset = PAYLOAD_GLOBAL_PTR((VOID*)g_payload_data);
-  *globalOffset = offsetToOriginal;
-  
-  INT32 *archOffset = PAYLOAD_ARCH_PTR((VOID*)g_payload_data);
-  *archOffset = ARCH_AMD;
+  *payloadGlobal = offsetToOriginal;
 
   //
   // Write the patch to memory

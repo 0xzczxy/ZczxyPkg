@@ -16,39 +16,59 @@ CFLAGS := -fPIC \
           -Wextra \
           -O2
 
-# Output files
-TARGET_ELF := payload.elf
-TARGET_BIN := payload.bin
-
-# Source files
-SOURCES := src/main.c src/serial.c
-OBJECTS := $(SOURCES:.c=.o)
+# Build directory
+BUILD := build
 
 # Linker script
 LINKER_SCRIPT := payload.ld
 
-# Default target
-all: $(TARGET_BIN)
+# Payload definitions
+INTEL_SRC := src/intel.c src/serial.c
+AMD_SRC   := src/amd.c  src/serial.c
 
-# Compile C sources to object files
-%.o: %.c
+INTEL_OBJS := $(INTEL_SRC:%.c=$(BUILD)/%.o)
+AMD_OBJS   := $(AMD_SRC:%.c=$(BUILD)/%.o)
+
+INTEL_ELF := $(BUILD)/payload-intel.elf
+INTEL_BIN := $(BUILD)/payload-intel.bin
+
+AMD_ELF := $(BUILD)/payload-amd.elf
+AMD_BIN := $(BUILD)/payload-amd.bin
+
+# Default target
+all: $(INTEL_BIN) $(AMD_BIN)
+
+# Ensure build directory exists
+$(BUILD):
+	mkdir -p $(BUILD)/src
+
+# Compile rule
+$(BUILD)/%.o: %.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Link object files into ELF using custom linker script
-$(TARGET_ELF): $(OBJECTS) $(LINKER_SCRIPT)
-	$(LD) -T $(LINKER_SCRIPT) $(OBJECTS) -o $@
+# Link rules
+$(INTEL_ELF): $(INTEL_OBJS) $(LINKER_SCRIPT)
+	$(LD) -T $(LINKER_SCRIPT) $(INTEL_OBJS) -o $@
 
-# Extract raw binary from ELF
-$(TARGET_BIN): $(TARGET_ELF)
+$(AMD_ELF): $(AMD_OBJS) $(LINKER_SCRIPT)
+	$(LD) -T $(LINKER_SCRIPT) $(AMD_OBJS) -o $@
+
+# Binary extraction
+$(INTEL_BIN): $(INTEL_ELF)
 	$(OBJCOPY) -O binary $< $@
-	@echo "✓ Generated $(TARGET_BIN)"
-	@ls -lh $(TARGET_BIN)
+	@echo "✓ Generated $(INTEL_BIN)"
+	@ls -lh $(INTEL_BIN)
 	@echo "✓ Offsets:"
-	@nm $(TARGET_ELF) | grep -E "G_original_offset_from_hook|G_arch|hooked_vmexit_handler" || echo "  (Check with: nm $(TARGET_ELF))"
+	@nm $(INTEL_ELF) | grep -E "G_original_offset_from_hook|G_arch|hooked_vmexit_handler" || echo "  (Check with: nm $(INTEL_ELF))"
+
+$(AMD_BIN): $(AMD_ELF)
+	$(OBJCOPY) -O binary $< $@
+	@echo "✓ Generated $(AMD_BIN)"
+	@ls -lh $(AMD_BIN)
+	@echo "✓ Offsets:"
+	@nm $(AMD_ELF) | grep -E "G_original_offset_from_hook|G_arch|hooked_vmexit_handler" || echo "  (Check with: nm $(AMD_ELF))"
 
 clean:
-	rm -f $(OBJECTS) $(TARGET_ELF) $(TARGET_BIN)
+	rm -rf $(BUILD)
 
 .PHONY: all clean
-
-
