@@ -27,7 +27,6 @@ static const char g_hex_chars[] = "0123456789ABCDEF";
 static void serial_write_char(char cin);
 static inline void IoWrite8(uint16_t port, uint8_t value);
 static inline uint8_t IoRead8(uint16_t port);
-static void uint64_to_hex(uint64_t value, char *buffer, int digits);
 static void int64_to_decimal(int64_t value, char *buffer);
 
 // Implementation
@@ -222,15 +221,6 @@ static inline uint8_t IoRead8(uint16_t port) {
 
 static inline void IoWrite8(uint16_t port, uint8_t value) {
   asm volatile("outb %0, %1" : : "a"(value), "dN"(port));
-}
-
-// Helper function to convert uint64 to hex string
-static void uint64_to_hex(uint64_t value, char *buffer, int digits) {
-  for (int i = digits - 1; i >= 0; i--) {
-    buffer[i] = g_hex_chars[value & 0xF];
-    value >>= 4;
-  }
-  buffer[digits] = '\0';
 }
 
 // Helper function to convert int64 to decimal string
