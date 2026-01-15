@@ -75,18 +75,10 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
     context_t *ctx = *(context_t**)a1;
 
     //
-    // Print out the rax value being seen
-    // 
-    serial_write_hex64("[+] CPUID Called", ctx->rax);
-
-    //
     // Check if rax is set to our special value
     // 
     if (ctx->rax == 0xDEADBEEFDEADBEEFull) {
-      //
-      // custom return value: zczxyhc\0 in little endian
-      // 
-      ctx->rax = 0x00636879787A637Aull;
+      serial_write("[*] CPUID Called with 0xDEADBEEFDEADBEEF!\n");
 
       //
       // Update guest RSP in VMCS
@@ -94,12 +86,23 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
       ctx->rsp = vmread(VMCS_GUEST_RSP);
 
       //
+      // custom return value: zczxyhc\0 in little endian
+      // 
+      ctx->rax = 0x00636879787A637Aull;
+
+      //
       // Advance guest RIP
       // 
       uint64_t guest_rip = vmread(VMCS_GUEST_RIP);
       uint64_t instruction_length = vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH);
+
+      serial_write_hex64("[+] Rip Before", guest_rip);
+      serial_write_hex64("[+] Instruction Length", instruction_length);
+
       uint64_t next_rip = guest_rip + instruction_length;
       vmwrite(VMCS_GUEST_RIP, next_rip);
+
+      serial_write_hex64("[+] Rip After", vmread(VMCS_GUEST_RIP));
 
       //
       // Write back RSP to VMCS
@@ -107,6 +110,8 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
       vmwrite(VMCS_GUEST_RSP, ctx->rsp);
 
       return 0;
+    } else if (ctx->rax == 0x00636879787A637Aull) {
+      serial_write("[!] CPUID Called with value supposed to be returned!\n");
     }
   }
 
