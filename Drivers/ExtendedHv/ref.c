@@ -1,3 +1,388 @@
+void sub_fffff800003a7000(void* arg1, int64_t arg2, int64_t arg3 @ rbx, int64_t* arg4 @ rbp, uint64_t arg5 @ rsi, int64_t arg6 @ rdi, int64_t arg7 @ r12, 
+  int64_t arg8 @ r13, int64_t arg9 @ r14, int64_t arg10 @ r15, int512_t arg11 @ zmm1) __noreturn
+{
+  *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xff8) = 0;
+  void* rcx = (char*)arg1 + 0xec0;
+  *(uint64_t*)((char*)rcx + 0x18) =
+    (&__return_addr & 0xfffffffffffff000) + 0xfc0;
+  *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0) = rcx;
+  TEB* gsbase;
+  
+  if (arg2)
+  {
+    if (arg2 != 1)
+    {
+      (uint128_t)arg11 = {0};
+      int512_t zmm2;
+      (uint128_t)zmm2 = {0};
+      int512_t zmm3;
+      (uint128_t)zmm3 = {0};
+      int512_t zmm4;
+      (uint128_t)zmm4 = {0};
+      int512_t zmm5;
+      (uint128_t)zmm5 = {0};
+      arg4 = nullptr;
+      arg3 = 0;
+      arg5 = 0;
+      arg6 = 0;
+      arg7 = 0;
+      arg8 = 0;
+      arg9 = 0;
+      arg10 = 0;
+      int512_t zmm6;
+      (uint128_t)zmm6 = {0};
+      int512_t zmm7;
+      (uint128_t)zmm7 = {0};
+      int512_t zmm8;
+      (uint128_t)zmm8 = {0};
+      int512_t zmm9;
+      (uint128_t)zmm9 = {0};
+      int512_t zmm10;
+      (uint128_t)zmm10 = {0};
+      int512_t zmm11;
+      (uint128_t)zmm11 = {0};
+      int512_t zmm12;
+      (uint128_t)zmm12 = {0};
+      int512_t zmm13;
+      (uint128_t)zmm13 = {0};
+      int512_t zmm14;
+      (uint128_t)zmm14 = {0};
+      int512_t zmm15;
+      (uint128_t)zmm15 = {0};
+      int128_t* i = *(uint64_t*)(gsbase->ClientId.UniqueProcess + 0x3b0);
+      gsbase->User32Reserved[2] = (uint32_t)i;
+      gsbase->User32Reserved[3] = *(uint32_t*)((char*)&i + 4);
+      gsbase->User32Reserved[4] =
+        ((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+      gsbase->User32Reserved[5] = *(uint32_t*)((char*)
+        &((&__return_addr & 0xfffffffffffff000) + 0xfe0) + 4);
+      *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) |= 0x20;
+      
+      do
+      {
+        *(uint128_t*)i = {0};
+        i = &i[1];
+      } while (i != (&__return_addr & 0xfffffffffffff000) + 0xfe0);
+      
+      *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) &= 0xdf;
+    }
+    else
+    {
+      arg11 = sub_fffff8000029e7d0();
+      rcx = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+    }
+  }
+  
+  *(uint8_t*)((char*)rcx + 0x20) |= 0x80;
+  uint64_t r8_2;
+  int512_t zmm1;
+  int512_t zmm2_1;
+  r8_2 = sub_fffff8000035bc70(rcx, arg11);
+  int512_t zmm1_1;
+  int512_t zmm2_2;
+  int512_t zmm6_1;
+  int512_t zmm7_1;
+  int512_t zmm8_1;
+  int512_t zmm9_1;
+  int512_t zmm10_1;
+  int512_t zmm11_1;
+  int512_t zmm12_1;
+  int512_t zmm13_1;
+  int512_t zmm14_1;
+  int512_t zmm15_1;
+  zmm1_1 = sub_fffff8000035aac0(
+    *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0), zmm1, 
+    r8_2, zmm2_1);
+  
+  while (true)
+  {
+    gsbase->User32Reserved[1] = 1;
+    int64_t* rdx_1 =
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+    void* r8_3 = rdx_1[2];
+    uint64_t rflags;
+    uint64_t rflags_1;
+    int64_t rax_7;
+    int64_t rcx_5;
+    int64_t rdx_2;
+    int64_t r8_4;
+    int64_t r9_4;
+    int64_t r10_2;
+    int64_t r11_2;
+    int128_t zmm0_1;
+    int128_t zmm3_1;
+    int128_t zmm4_1;
+    int128_t zmm5_1;
+    
+    if (*(uint8_t*)((char*)rdx_1 + 0xb1) & 1)
+    {
+      int64_t* rcx_7 = *(uint64_t*)rdx_1 + 0x70;
+      char temp0_1 = rdx_1[4];
+      
+      if (temp0_1)
+      {
+        if (temp0_1 <= 0)
+        {
+          arg3 = rcx_7[-0xb];
+          arg4 = rcx_7[-9];
+          arg5 = rcx_7[-8];
+          arg6 = rcx_7[-7];
+          arg7 = rcx_7[-2];
+          arg8 = rcx_7[-1];
+          arg9 = *(uint64_t*)rcx_7;
+          arg10 = rcx_7[1];
+        }
+        
+        if (rdx_1[4] & 0x40)
+        {
+          (uint128_t)zmm6_1 = *(uint128_t*)((char*)rcx_7 + 0x70);
+          (uint128_t)zmm7_1 = *(uint128_t*)((char*)rcx_7 + 0x80);
+          (uint128_t)zmm8_1 = *(uint128_t*)((char*)rcx_7 + 0x90);
+          (uint128_t)zmm9_1 = *(uint128_t*)((char*)rcx_7 + 0xa0);
+          (uint128_t)zmm10_1 = *(uint128_t*)((char*)rcx_7 + 0xb0);
+          (uint128_t)zmm11_1 = *(uint128_t*)((char*)rcx_7 + 0xc0);
+          (uint128_t)zmm12_1 = *(uint128_t*)((char*)rcx_7 + 0xd0);
+          (uint128_t)zmm13_1 = *(uint128_t*)((char*)rcx_7 + 0xe0);
+          (uint128_t)zmm14_1 = *(uint128_t*)((char*)rcx_7 + 0xf0);
+          (uint128_t)zmm15_1 = *(uint128_t*)((char*)rcx_7 + 0x100);
+        }
+        
+        rdx_1[4] = 0;
+      }
+      
+      zmm0_1 = *(uint128_t*)((char*)rcx_7 + 0x10);
+      (uint128_t)zmm1_1 = *(uint128_t*)((char*)rcx_7 + 0x20);
+      (uint128_t)zmm2_2 = *(uint128_t*)((char*)rcx_7 + 0x30);
+      zmm3_1 = *(uint128_t*)((char*)rcx_7 + 0x40);
+      zmm4_1 = *(uint128_t*)((char*)rcx_7 + 0x50);
+      zmm5_1 = *(uint128_t*)((char*)rcx_7 + 0x60);
+      rdx_1[0x16] = 1;
+      char temp0_2;
+      int32_t temp1_1;
+      temp0_2 = __rdmsr(0x3b);
+      uint64_t rdx_4 = (uint64_t)temp1_1 << 0x20;
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfd0) =
+        (uint64_t)temp0_2 | rdx_4;
+      int64_t msrs_1 = __wrmsr(0, (uint32_t)rdx_4, 0x3b);
+      int64_t rcx_11 =
+        (*(uint64_t*)rdx_1[0x14] & 0xfffffffffffff000) | rdx_1[0x15];
+      int64_t rdx_5 = rcx_7[-0xc];
+      r8_4 = rcx_7[-6];
+      r9_4 = rcx_7[-5];
+      r10_2 = rcx_7[-4];
+      r11_2 = rcx_7[-3];
+      uint64_t rax_12;
+      rax_12 = __seamcall(0);
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8) =
+        rcx_11;
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfc0) =
+        rax_12;
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfc8) = rdx_5;
+      int64_t rax_13 =
+        *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfd0);
+      int64_t msrs =
+        __wrmsr((uint32_t)rax_13, (int32_t)(rax_13 >> 0x20), 0x3b);
+      rcx_5 = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8);
+      rdx_2 = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfc8);
+      rax_7 = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfc0);
+      
+      if (!(int32_t)(
+          *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfc0)
+          >> 0x20))
+        *(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0) = 0;
+      else
+        *(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0) =
+          0x80001013;
+    }
+    else
+    {
+      char rcx_2 =
+        *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) | 0xe;
+      
+      if (rcx_2 & 0x10)
+      {
+        int128_t* i_1 =
+          *(uint64_t*)(gsbase->ClientId.UniqueProcess + 0x3b0);
+        gsbase->User32Reserved[2] = (uint32_t)i_1;
+        gsbase->User32Reserved[3] = *(uint32_t*)((char*)&i_1 + 4);
+        gsbase->User32Reserved[4] =
+          ((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+        gsbase->User32Reserved[5] = *(uint32_t*)((char*)
+          &((&__return_addr & 0xfffffffffffff000) + 0xfe0) + 4);
+        rcx_2 = (rcx_2 & 0xef) | 0x20;
+        *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) = rcx_2;
+        
+        do
+        {
+          *(uint128_t*)i_1 = {0};
+          i_1 = &i_1[1];
+        } while (i_1 != (&__return_addr & 0xfffffffffffff000) + 0xfe0);
+        
+        rcx_2 &= 0xdf;
+      }
+      
+      *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) = rcx_2;
+      int64_t* rcx_4 = *(uint64_t*)rdx_1 + 0x70;
+      arg3 = rcx_4[-0xb];
+      arg4 = rcx_4[-9];
+      arg5 = rcx_4[-8];
+      arg6 = rcx_4[-7];
+      arg7 = rcx_4[-2];
+      arg8 = rcx_4[-1];
+      arg9 = *(uint64_t*)rcx_4;
+      arg10 = rcx_4[1];
+      
+      if (rdx_1[4] & 1)
+      {
+        if (rdx_1[4] & 0x40)
+        {
+          (uint128_t)zmm6_1 = *(uint128_t*)((char*)rcx_4 + 0x70);
+          (uint128_t)zmm7_1 = *(uint128_t*)((char*)rcx_4 + 0x80);
+          (uint128_t)zmm8_1 = *(uint128_t*)((char*)rcx_4 + 0x90);
+          (uint128_t)zmm9_1 = *(uint128_t*)((char*)rcx_4 + 0xa0);
+          (uint128_t)zmm10_1 = *(uint128_t*)((char*)rcx_4 + 0xb0);
+          (uint128_t)zmm11_1 = *(uint128_t*)((char*)rcx_4 + 0xc0);
+          (uint128_t)zmm12_1 = *(uint128_t*)((char*)rcx_4 + 0xd0);
+          (uint128_t)zmm13_1 = *(uint128_t*)((char*)rcx_4 + 0xe0);
+          (uint128_t)zmm14_1 = *(uint128_t*)((char*)rcx_4 + 0xf0);
+          (uint128_t)zmm15_1 = *(uint128_t*)((char*)rcx_4 + 0x100);
+        }
+        
+        __builtin_memset(&rcx_4[0xe], 0, 0x20);
+        __builtin_memset(&rcx_4[0x12], 0, 0x80);
+        rdx_1[4] = 0x80;
+      }
+      
+      (uint128_t)zmm1_1 = *(uint128_t*)((char*)rcx_4 + 0x20);
+      (uint128_t)zmm2_2 = *(uint128_t*)((char*)rcx_4 + 0x30);
+      zmm3_1 = *(uint128_t*)((char*)rcx_4 + 0x40);
+      zmm4_1 = *(uint128_t*)((char*)rcx_4 + 0x50);
+      zmm5_1 = *(uint128_t*)((char*)rcx_4 + 0x60);
+      __builtin_memset(&rcx_4[4], 0, 0x50);
+      void* r9_3 = *(uint64_t*)((char*)r8_3 + 0x28);
+      bool z_1;
+      
+      if (0 == *(uint8_t*)((char*)r9_3 + 0x127))
+      {
+        *(uint8_t*)((char*)r9_3 + 0x127) = 1;
+        z_1 = true;
+      }
+      else
+      {
+        int64_t rax_5;
+        (uint8_t)rax_5 = *(uint8_t*)((char*)r9_3 + 0x127);
+        z_1 = false;
+      }
+      
+      rdx_2 = rcx_4[-0xc];
+      r8_4 = rcx_4[-6];
+      r9_4 = rcx_4[-5];
+      r10_2 = rcx_4[-4];
+      r11_2 = rcx_4[-3];
+      __builtin_memset(rcx_4, 0, 0x20);
+      zmm0_1 = *(uint128_t*)((char*)rcx_4 + 0x10);
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8) =
+        rcx_4[-0xd];
+      rax_7 = rcx_4[-0xe];
+      __builtin_memset(&rcx_4[-0xe], 0, 0x70);
+      rcx_5 = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8);
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8) = 0;
+      
+      if (z_1)
+        rflags_1 = __vmlaunch(rflags);
+      else
+        rflags_1 = __vmresume(rflags);
+      
+      if (z_1)
+        *(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0) =
+          0x80001012;
+      else
+        *(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0) =
+          0x80001011;
+    }
+    
+    *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8) = rcx_5;
+    int64_t* rcx_13 =
+      **(uint64_t**)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+    *(uint64_t*)rcx_13 = rax_7;
+    rcx_13[2] = rdx_2;
+    rcx_13[3] = arg3;
+    rcx_13[5] = arg4;
+    rcx_13[6] = arg5;
+    rcx_13[7] = arg6;
+    rcx_13[8] = r8_4;
+    rcx_13[9] = r9_4;
+    rcx_13[0xa] = r10_2;
+    rcx_13[0xb] = r11_2;
+    rcx_13[0xc] = arg7;
+    rcx_13[0xd] = arg8;
+    rcx_13[0xe] = arg9;
+    rcx_13[0xf] = arg10;
+    rcx_13[1] = *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8);
+    *(uint128_t*)((char*)rcx_13 + 0x80) = zmm0_1;
+    *(uint128_t*)((char*)rcx_13 + 0x90) = (uint128_t)zmm1_1;
+    *(uint128_t*)((char*)rcx_13 + 0xa0) = (uint128_t)zmm2_2;
+    *(uint128_t*)((char*)rcx_13 + 0xb0) = zmm3_1;
+    *(uint128_t*)((char*)rcx_13 + 0xc0) = zmm4_1;
+    *(uint128_t*)((char*)rcx_13 + 0xd0) = zmm5_1;
+    arg4 = rcx_13;
+    *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+    (uint128_t)zmm1_1 = {0};
+    (uint128_t)zmm2_2 = {0};
+    arg3 = 0;
+    arg6 = 0;
+    arg7 = 0;
+    arg8 = 0;
+    arg9 = 0;
+    arg10 = 0;
+    *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe8) = 0;
+    *(uint8_t*)((char*)&gsbase->User32Reserved[1] + 1) &= 0xf9;
+    int32_t r8_7;
+    int128_t zmm0_2;
+    r8_7 = sub_fffff800003a4000();
+    gsbase->User32Reserved[1] = 0;
+    uint128_t** rcx_15 =
+      *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+    *(uint8_t*)((char*)rcx_15 - 0xabb) = 0;
+    arg5 = 0;
+    
+    if (!*(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0))
+    {
+      if (data_fffff800000af0b0 & 1)
+      {
+        void* rax_18 = *(int64_t*)((char*)gsbase + 0x2c680);
+        arg5 = (uint64_t)*(uint16_t*)((char*)rax_18 + 0x2b4);
+        r8_7 = *(uint32_t*)((char*)rax_18 + 0x2b4);
+      }
+      else if (!(*(uint8_t*)((char*)rcx_15 + 0xb1) & 1))
+      {
+        int32_t rsi_1;
+        rsi_1 = __vmread_gpr64_gpr64(0x4402);
+        r8_7 = rsi_1;
+        arg5 = (uint64_t)(uint16_t)rsi_1;
+      }
+      else
+      {
+        arg5 = (uint64_t)*(uint16_t*)arg4;
+        r8_7 = *(uint32_t*)arg4;
+      }
+      
+      if ((uint16_t)arg5 == 1)
+      {
+        sub_fffff800003a6050(rcx_15, arg4, zmm0_2);
+        rcx_15 =
+          *(uint64_t*)((&__return_addr & 0xfffffffffffff000) + 0xfe0);
+      }
+    }
+    
+    rflags = __sti(rflags_1);
+    zmm1_1 = sub_fffff8000035cb70(rcx_15, 
+      (uint32_t)arg5
+        | *(uint32_t*)((&__return_addr & 0xfffffffffffff000) + 0xff0), 
+      r8_7, zmm1_1, zmm2_2);
+  }
+}
+
 uint64_t sub_fffff8000035cb70(uint128_t** arg1, int32_t arg2, int32_t arg3, int512_t arg4 @ zmm1, int512_t arg5 @ zmm2)
 {
   void var_108;
