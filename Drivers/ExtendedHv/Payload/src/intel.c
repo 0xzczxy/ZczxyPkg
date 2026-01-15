@@ -41,37 +41,43 @@ uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(
   //
   // CPUID Exit Reason
   // 
-  if (exit_reason == 0x0A) {
+  if (exit_reason == 0x10) {  // Note: 0x10, not 0x0A!
     //
-    // Get pointer to guest register array
+    // Get guest registers
     //
     uint64_t *guest_regs = *(uint64_t**)arg1;
 
     //
-    // Read guest RAX (first register, index 0)
+    // Read guest RAX (CPUID leaf)
     //
     uint64_t leaf_value = guest_regs[0];
     
     if (leaf_value == 0xDEADBEEFDEADBEEF) {
       //
-      // Write to guest RAX
-      // "zczxyhc\0" little endian hex
+      // Set guest RAX to custom value
+      // zczxyhc\0
       //
       guest_regs[0] = 0x00636879787a637a;
+      
+      //
+      // Set VM state to 0x1f (advance RIP and resume)
+      //
+      void **base = (void **)arg1;
+      *(uint32_t*)&base[-0x1d8] = 0x1f;
+      
+      //
+      // Return the expected value
+      //
+      return (uint64_t)base[-0x160];
     }
-
-    //
-    // TODO: We should be early returning but I still have no idea
-    //       what this function returns.
-    // 
   }
   
   //
-  // Call original handler
+  // Call original handler for other cases
   //
   original_vmexit_handler_t original = (original_vmexit_handler_t)(
     (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
   );
-  return original(arg1, exit_reason, exit_reason_full /*, arg4, arg5 */);
+  return original(arg1, exit_reason, exit_reason_full);
 }
 
