@@ -44,7 +44,7 @@ __attribute__((section(".text.function")))
 uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 
 // Private Globals
-// None
+static int g_has_been_called = 0;
 
 // Private Functions
 static inline uint64_t vmread(uint64_t field);
@@ -57,6 +57,10 @@ static inline void vmwrite(uint64_t field, uint64_t value);
 // Reference: https://github.com/noahware/hyper-reV/blob/main/hyperv-attachment/src/main.cpp
 // 
 uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
+  if (!g_has_been_called) {
+    g_has_been_called = 1;
+    serial_write("[+] Intel VM-Exit Handler Initialized.\n");
+  }
 
   //
   // Read through vmread(VMCS_EXIT_REASON)
@@ -67,6 +71,8 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
   // Check if we this was caused by a cpuid
   // 
   if (exit_reason == VMX_EXIT_REASON_EXECUTE_CPUID) {
+    serial_write("[+] CPUID Called.\n");
+    
     context_t *ctx = *(context_t**)a1;
 
     //
