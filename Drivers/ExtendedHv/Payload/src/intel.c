@@ -126,11 +126,11 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
 
 static inline uint64_t vmread(uint64_t field) {
   uint64_t value;
-  __asm__ volatile("vmread %0, %1" : "=r"(value) : "r"(field) : "cc");
+  __asm__ volatile("vmread %1, %0" : "=r"(value) : "r"(field) : "cc");
   return value;
 }
    
 static inline void vmwrite(uint64_t field, uint64_t value) {
-  __asm__ volatile("vmwrite %0, %1" : : "r"(field), "r"(value) : "cc");
+  __asm__ volatile("vmwrite %1, %0" : : "r"(field), "r"(value) : "cc");
 }
 
