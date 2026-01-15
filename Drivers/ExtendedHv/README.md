@@ -10,58 +10,6 @@ This DXE_RUNTIME_DRIVER provides functionality for direct user control at VTL 1 
 **WARNING: DO NOT ATTEMPT TO TAKE ANYTHING WE SAY AS PROFESSIONAL ADVICE.**
 **WARNING: WE DO NOT GIVE ANY LIABILITY OR WARRANTY, EXPLICIT OR IMPLICIT, NOT EVEN TO THE PROPER FUNCTIONING OF THE DRIVER.**
 
-
-## Quickstart
-
-**Clone EDK2**
-```
-git clone https://github.com/tianocore/edk2.git
-cd edk2
-git submodule --init --update
-```
-
-**Make Base Tools**
-```
-make -C BaseTools
-```
-
-**Source edk2 script**
-```
-source edksetup.sh
-```
-
-**Compile Shell Package**
-```
-build -a X64 -t GCC5 -p ShellPkg/ShellPkg.dsc
-```
-
-**Compile Zczxy Package**
-```
-build -a X64 -t GCC5 -p ZczxyPkg/ZczxyPkg.dsc
-```
-
-**Copy Shell_E....efi application and the ExtendedHv.efi driver into your USB stick**
-```
-TODO
-```
-
-**Boot from the USB stick (Motherboard Specific)**
-```
-Motherboard Specific, No Help Provided, Check your motherboard UEFI settings help guide.
-```
-
-**Once in the Shell, Use the 'load' command to load the driver**
-```
-load Path\To\Driver\ExtendedHv.efi
-```
-
-**Finally, use the 'exit' command and let it boot into windows**
-```
-exit
-# Note UEFI will automatically go to the next boot option which should be windows boot manager
-# or (in the case of grub) allow a screen to select the windows boot manager.
-```
-
 ## Implementation Details
 
 **Control Flow**
