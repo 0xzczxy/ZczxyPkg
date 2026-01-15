@@ -101,7 +101,8 @@ static EFI_STATUS PatchIntel(IN UINT64 imageBase, IN UINT64 section) {
   // even with the documentation, no one knows what was going through
   // the developers mind when designing this system.)
   //
-  if (EFI_ERROR(PatchCall(imageBase, section, "FB 8B D6 0B 54 24 30 E8 ? ? ? ?", 7, INTEL_PAYLOAD_GLOBAL_PTR(g_intel_payload_data), INTEL_PAYLOAD_FUNCTION_OFFSET))) {
+
+  if (EFI_ERROR(PatchCall(imageBase, section, "E8 ? ? ? ? E9 ? ? ? ? 74", 0, INTEL_PAYLOAD_GLOBAL_PTR(g_intel_payload_data), INTEL_PAYLOAD_FUNCTION_OFFSET))) {
     SerialPrint("[!] Failed to patch Call for Intel, not copying!\n");
     return EFI_UNSUPPORTED;
   }

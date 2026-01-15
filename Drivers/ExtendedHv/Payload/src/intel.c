@@ -62,10 +62,16 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
   // Read through vmread(VMCS_EXIT_REASON)
   // 
   uint64_t exit_reason = vmread(VMCS_EXIT_REASON);
-  
+
+  //
+  // Check if we this was caused by a cpuid
+  // 
   if (exit_reason == VMX_EXIT_REASON_EXECUTE_CPUID) {
     context_t *ctx = *(context_t**)a1;
 
+    //
+    // Check if rax is set to our special value
+    // 
     if (ctx->rax == 0xDEADBEEFDEADBEEFull) {
       //
       // custom return value: zczxyhc\0 in little endian
