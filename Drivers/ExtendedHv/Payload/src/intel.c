@@ -49,7 +49,7 @@ static int g_has_been_called = 0;
 
 // Private Functions
 static inline uint64_t vmread(uint64_t field);
-static inline uint8_t vmwrite(uint64_t field, uint64_t value) {
+// static inline void vmwrite(uint64_t field, uint64_t value);
 
 // Implementation
 
@@ -82,34 +82,33 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
       //
       // Update guest RSP in VMCS
       // 
-      ctx->rsp = vmread(VMCS_GUEST_RSP);
+      // ctx->rsp = vmread(VMCS_GUEST_RSP);
 
       //
       // custom return value: zczxyhc\0 in little endian
       // 
-      ctx->rax = 0x00636879787A637Aull;
+      ctx->r8 = 0x00636879787A637Aull;
 
       //
       // Advance guest RIP
       // 
-      uint64_t guest_rip = vmread(VMCS_GUEST_RIP);
-      uint64_t instruction_length = vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH);
+      // uint64_t guest_rip = vmread(VMCS_GUEST_RIP);
+      // uint64_t instruction_length = vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH);
 
-      serial_write_hex64("[+] Rip Before", guest_rip);
-      serial_write_hex64("[+] Instruction Length", instruction_length);
+      // serial_write_hex64("[+] Rip Before", guest_rip);
+      // serial_write_hex64("[+] Instruction Length", instruction_length);
 
-      uint64_t next_rip = guest_rip + instruction_length;
-      uint8_t error = vmwrite(VMCS_GUEST_RIP, next_rip);
+      // uint64_t next_rip = guest_rip + instruction_length;
+      // vmwrite(VMCS_GUEST_RIP, next_rip);
 
-      serial_write_hex64("[!] vmwrite error", error);
-      serial_write_hex64("[+] RIP After", vmread(VMCS_GUEST_RIP));
+      // serial_write_hex64("[+] RIP After", vmread(VMCS_GUEST_RIP));
 
       //
       // Write back RSP to VMCS
       // 
-      vmwrite(VMCS_GUEST_RSP, ctx->rsp);
+      // vmwrite(VMCS_GUEST_RSP, ctx->rsp);
 
-      return 0;
+      // return 0;
     } else if (ctx->rax == 0x00636879787A637Aull) {
       serial_write("[!] CPUID Called with value supposed to be returned!\n");
     }
@@ -131,19 +130,8 @@ static inline uint64_t vmread(uint64_t field) {
 }
 
 
-static inline uint8_t vmwrite(uint64_t field, uint64_t value) {
-  uint8_t error;
-  __asm__ volatile(
-    "vmwrite %2, %1\n\t"
-    "setc %0\n\t"        // Set if CF=1 (VMfailInvalid)
-    "jc 1f\n\t"
-    "setz %0\n\t"        // Set if ZF=1 (VMfailValid)
-    "1:"
-    : "=r"(error)
-    : "r"(field), "r"(value)
-    : "cc"
-  );
-  return error;
-}
+// static inline void vmwrite(uint64_t field, uint64_t value) {
+//   __asm__ volatile("vmwrite %2, %1" : "r"(field), "r"(value) : "cc");
+// }
 
 
