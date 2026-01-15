@@ -34,6 +34,7 @@ typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(uint64_t a
 
 // Import
 extern void serial_write(const char *string);
+extern void serial_write_hex64(const char *msg, uint64_t value);
 
 // Public Globals
 __attribute__((section(".data.global")))
@@ -71,9 +72,12 @@ uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64
   // Check if we this was caused by a cpuid
   // 
   if (exit_reason == VMX_EXIT_REASON_EXECUTE_CPUID) {
-    serial_write("[+] CPUID Called.\n");
-    
     context_t *ctx = *(context_t**)a1;
+
+    //
+    // Print out the rax value being seen
+    // 
+    serial_write_hex64("[+] CPUID Called", ctx->rax);
 
     //
     // Check if rax is set to our special value
