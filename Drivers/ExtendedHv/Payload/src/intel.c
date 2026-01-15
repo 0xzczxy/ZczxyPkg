@@ -1,15 +1,39 @@
-#include "intel.h"
 #include <stdint.h>
 #include <stddef.h>
 
-typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(void *arg1, uint32_t exit_reason, uint32_t exit_reason_full);
+//
+// Reference Intel Manual
+// 
+#define VMCS_EXIT_REASON                    0x00004402
+#define VMCS_GUEST_RIP                      0x0000681E
+#define VMCS_GUEST_RSP                      0x0000681C
+#define VMCS_VMEXIT_INSTRUCTION_LENGTH      0x0000440C
+#define VMX_EXIT_REASON_EXECUTE_CPUID       0x0000000A
+
+struct context {
+  uint64_t rax;
+  uint64_t rcx;
+  uint64_t rdx;
+  uint64_t rbx;
+  uint64_t rsp;
+  uint64_t rbp;
+  uint64_t rsi;
+  uint64_t rdi;
+  uint64_t r8;
+  uint64_t r9;
+  uint64_t r10;
+  uint64_t r11;
+  uint64_t r12;
+  uint64_t r13;
+  uint64_t r14;
+  uint64_t r15;
+};
+typedef struct context context_t;
+
+typedef uint64_t (__attribute__((ms_abi)) *original_vmexit_handler_t)(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 
 // Import
 extern void serial_write(const char *string);
-extern void serial_write_pointer(const char *msg, void *addr);
-extern void serial_write_hex32(const char *msg, uint32_t value);
-extern void serial_write_hex64(const char *msg, uint64_t value);
-extern void serial_write_hex_dump(const char *msg, void *addr, uint32_t length);
 
 // Public Globals
 __attribute__((section(".data.global")))
@@ -17,69 +41,76 @@ int64_t G_original_offset_from_hook = 0x0;
 
 // Public Functions
 __attribute__((section(".text.function")))
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(void *arg1, uint32_t exit_reason, uint32_t exit_reason_full);
+uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 
 // Private Globals
 // None
 
 // Private Functions
-// None
+static inline uint64_t vmread(uint64_t field);
+static inline void vmwrite(uint64_t field, uint64_t value);
 
 
 // Implementation
 
-uint64_t __attribute__((ms_abi)) hooked_vmexit_handler(
-    void *arg1, 
-    uint32_t exit_reason, 
-    uint32_t exit_reason_full
-    /* int512_t arg3, */
-    /* int512_t arg4, */
-    // We don't consider these since it hasn't effected us yet
-    // TODO: Don't program like this in such sensitive systems,
-    //       feeling like a windows developer in this mindset
-) {
-  //
-  // CPUID Exit Reason (0x0A = 10 decimal)
-  // 
-  if (exit_reason == 0x0A) {
-    //
-    // Get pointer to guest register array
-    //
-    uint64_t *guest_regs = *(uint64_t**)arg1;
+//
+// Reference: https://github.com/noahware/hyper-reV/blob/main/hyperv-attachment/src/main.cpp
+// 
+uint64_t __attribute__((ms_abi)) vmexit_handler(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
 
-    //
-    // Read guest RAX (CPUID leaf - first register, index 0)
-    //
-    uint64_t leaf_value = guest_regs[0];
-    
-    if (leaf_value == 0xDEADBEEFDEADBEEF) {
+  //
+  // Read through vmread(VMCS_EXIT_REASON)
+  // 
+  uint64_t exit_reason = vmread(VMCS_EXIT_REASON);
+  
+  if (exit_reason == VMX_EXIT_REASON_EXECUTE_CPUID) {
+    context_t *ctx = *(context_t**)a1;
+
+    if (ctx->rax == 0xDEADBEEFDEADBEEFull) {
       //
-      // Set custom RAX value
-      // "zczxyhc\0" little endian hex
+      // custom return value: zczxyhc\0 in little endian
+      // 
+      ctx->rax = 0x00636879787A637Aull;
+
       //
-      guest_regs[0] = 0x00636879787a637a;
-      
+      // Update guest RSP in VMCS
+      // 
+      ctx->rsp = vmread(VMCS_GUEST_RSP);
+
       //
-      // Set VM state to 0x1f (advance RIP and resume)
-      // This tells the hypervisor to skip the CPUID instruction
+      // Advance guest RIP
+      // 
+      uint64_t guest_rip = vmread(VMCS_GUEST_RIP);
+      uint64_t instruction_length = vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH);
+      uint64_t next_rip = guest_rip + instruction_length;
+      vmwrite(VMCS_GUEST_RIP, next_rip);
+
       //
-      void **base = (void **)arg1;
-      *(uint32_t*)&base[-0x1d8] = 0x1f;
-      
-      //
-      // Return early without calling original handler
-      // Return value is arg1[-0x160]
-      //
-      return (uint64_t)base[-0x160];
+      // Write back RSP to VMCS
+      // 
+      vmwrite(VMCS_GUEST_RSP, ctx->rsp);
+
+      return 0;
     }
   }
-  
+
   //
   // Call original handler for other cases
   //
   original_vmexit_handler_t original = (original_vmexit_handler_t)(
-    (uint64_t)hooked_vmexit_handler + G_original_offset_from_hook
+    (uint64_t)vmexit_handler + G_original_offset_from_hook
   );
-  return original(arg1, exit_reason, exit_reason_full);
+  return original(a1, a2, a3, a4);
+}
+
+
+static inline uint64_t vmread(uint64_t field) {
+  uint64_t value;
+  __asm__ volatile("vmread %1, %0" : "=r"(value) : "r"(field) : "cc");
+  return value;
+}
+   
+static inline void vmwrite(uint64_t field, uint64_t value) {
+  __asm__ volatile("vmwrite %1, %0" : : "r"(field), "r"(value) : "cc");
 }
 
