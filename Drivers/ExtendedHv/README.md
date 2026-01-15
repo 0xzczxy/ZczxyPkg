@@ -28,6 +28,13 @@ Unauthorized modification of system software may:
 
 This DXE_RUNTIME_DRIVER provides functionality for direct user control at VTL 1 permission level, the new highest permission level in Windows 11.
 
+## References
+
+**References**
+- [noahware/hyper-reV](https://github.com/noahware/hyper-reV/tree/main)
+- [backengineering/Voyager](https://github.com/backengineering/Voyager/tree/master)
+- [SamuelTulach/SecureHack](https://github.com/SamuelTulach/SecureHack)
+
 ## Implementation Details
 
 **Control Flow**
