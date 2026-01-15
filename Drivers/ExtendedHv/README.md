@@ -47,6 +47,12 @@ BlLdrLoadImage:
 - AddSection
 - InstallPayload
 - PatchCallInstruction
+
+PayloadEntry: (Architecture specific, brief outline)
+- GetExitReason
+- CheckRaxIsLeaf
+- SetR8
+- Continue
 ```
 
 Once the payload is installed it will sit on the vmexit functionality, intercepting calls for CPUID with a specific leaf value to create a hypercall interface.
@@ -64,3 +70,8 @@ We have been forced to utilize **Program Data** as the best option, an assembly 
 
 Its a bit hacky, but it does work, you compile the payload separately, generate the header file by a python script, and compile the driver with the payloads byte embedded into the .data section. The function will have to exist at a specific offset which is why we need to utilize linker scripts.
 
+Finally, the payload itself, there are multiple options for handling the payload, we have currently only built the intel version where yet another hack has been used, for some reason within the payload, vmwrite does not work. Like, vmread will read the correct value, but vmwrite will not update it, this can be seen in the comments left over from my headaches. I have chosen to just accept that cpuid will clear four registers (rax, rbx, rcx, rdx) and just put these as argument registers which will be cleared, then we return using the extended registers r8-r15.
+
+Looking for another way is just really not worth the time, this method works, at worse, its more detectable I guess, there is currently no detection for this kind of vector so it doesn't really detract from it at all anyway.
+
+Overall, this project is now classed as a success on intel x64 system (Tested on nixos/kvm(nested)/libvirt).
