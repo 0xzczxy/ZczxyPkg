@@ -1,14 +1,32 @@
 # Extending Windows Hyper Visor
 
-## Overview
-
-This DXE_RUNTIME_DRIVER provides functionality for direct user control at VTL 1 permission level, the new highest permission level in Windows 11.
-
-**WARNING: This is inrecibly dangerous and could cause, system instability, potential copywright violations (depending on juridstication), or could fall to exploitation by malicous actors.**
+**WARNING: THIS IS INCREDIBLY DANGEROUS AND COULD CAUSE: SYSTEM INSTABILITY, POTENTIAL COPYRIGHT VIOLATIONS, OR FALL TO EXPLOITATION BY MALICOUS ACTORS.**
 **WARNING: DO NOT UNDER ANY CIRCUMSTANCES INSTALL THIS WITHOUT KNOWING WHAT IT DOES AND PROPERLY UNDERSTANDING THE RISK.**
 **WARNING: CONSULT PROPER LEGAL AND TECHNOLOGICAL ADVISEMENT ON THIS PACKAGE FROM VERIFIED EXPERTS, WHICH THE CREATORS ARE NOT.**
 **WARNING: DO NOT ATTEMPT TO TAKE ANYTHING WE SAY AS PROFESSIONAL ADVICE.**
 **WARNING: WE DO NOT GIVE ANY LIABILITY OR WARRANTY, EXPLICIT OR IMPLICIT, NOT EVEN TO THE PROPER FUNCTIONING OF THE DRIVER.**
+
+## LICENSE
+
+This project is released into the public domain under the Unlicense.
+See the LICENSE file for full legal text.
+
+**NO WARRANTIES OR GUARANTEES OF ANY KIND.**
+**USE ENTIRELY AT YOUR OWN RISK.**
+
+## DISCLAIMER
+
+This project is for EDUCATIONAL AND RESEARCH PURPOSES ONLY.
+Users must comply with all applicable laws and regulations.
+Unauthorized modification of system software may:
+- Void warranties
+- Violate software licenses
+- Compromise system security
+- Violate computer fraud and abuse laws
+
+## Overview
+
+This DXE_RUNTIME_DRIVER provides functionality for direct user control at VTL 1 permission level, the new highest permission level in Windows 11.
 
 ## Implementation Details
 
@@ -45,6 +63,4 @@ We have multiple options on how to integrate our payload:
 We have been forced to utilize **Program Data** as the best option, an assembly module is unrealistic with how complex the VmExitHandler code will be, and we can't rely on __ImageBase since I personally compile and test on a linux system (nixos).
 
 Its a bit hacky, but it does work, you compile the payload separately, generate the header file by a python script, and compile the driver with the payloads byte embedded into the .data section. The function will have to exist at a specific offset which is why we need to utilize linker scripts.
-
-
 
